@@ -1,0 +1,5 @@
+model: distilbert-base-uncased
+cuda: True
+sim_threshold: 0.8
+hvi_threshold: 0.7
+batch_size: 8

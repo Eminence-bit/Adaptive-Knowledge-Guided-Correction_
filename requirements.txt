@@ -1,0 +1,7 @@
+torch==1.13.1
+transformers==4.35.0
+requests==2.31.0
+scipy==1.11.4
+numpy==1.26.4
+rouge-score==0.1.2
+bert-score==0.3.13
