@@ -351,7 +351,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Issues**: [GitHub Issues](https://github.com/yourusername/Adaptive-Knowledge-Guided-Correction/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/yourusername/Adaptive-Knowledge-Guided-Correction/discussions)
-- **Email**: [your-email@domain.com](mailto:your-email@domain.com)
+- **Email**: [your-email@domain.com](mailto:prajyothnani123@gmail.com)
 
 ## 🔮 Roadmap
 
