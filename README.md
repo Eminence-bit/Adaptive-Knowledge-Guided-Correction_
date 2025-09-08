@@ -65,8 +65,8 @@ HVI:    0.657 | Corrected: True | Accuracy: 0%
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/Adaptive-Knowledge-Guided-Correction.git
-cd Adaptive-Knowledge-Guided-Correction
+git clone https://github.com/Eminence-bit/Adaptive-Knowledge-Guided-Correction_.git
+cd Adaptive-Knowledge-Guided-Correction_
 
 # Create virtual environment
 python3 -m venv akgc_env
@@ -349,8 +349,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/Adaptive-Knowledge-Guided-Correction/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/Adaptive-Knowledge-Guided-Correction/discussions)
+- **Issues**: [GitHub Issues](https://github.com/Eminence-bit/Adaptive-Knowledge-Guided-Correction/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Eminence-bit/Adaptive-Knowledge-Guided-Correction/discussions)
 - **Email**: [your-email@domain.com](mailto:prajyothnani123@gmail.com)
 
 ## 🔮 Roadmap
