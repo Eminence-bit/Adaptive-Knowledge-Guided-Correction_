@@ -1,37 +1,96 @@
-# Brief Overview of the AKGC Algorithm
+# Adaptive Knowledge-Guided Correction (AKGC)
 
-## Purpose
+## Purpose  
 
-The **Adaptive Knowledge-Guided Correction (AKGC)** algorithm is designed to detect and correct hallucinations in Large Language Models (LLMs) in real-time, targeting domains like complaint handling, science, and history. Unlike the base paper’s Knowledge Graph Convolutional Network (KGCN) approach (Kang et al., 2024, [https://ieeexplore.ieee.org/document/10650208](https://ieeexplore.ieee.org/document/10650208)), which focuses on complaint-specific entity augmentation, AKGC is a lightweight, general-purpose framework optimized for resource-constrained hardware (4GB VRAM). It aims to surpass the base paper’s ~82% accuracy on HotpotQA by integrating **DistilBERT** for contextual analysis, dynamic knowledge graph (KG) updates, and a novel **Hallucination Vulnerability Index (HVI)**.
+The **Adaptive Knowledge-Guided Correction (AKGC)** algorithm detects and corrects factual hallucinations in Large Language Models (LLMs) **in real-time**.  
+Unlike heavy graph neural network approaches (e.g., KGCN by Kang et al., 2024), AKGC is **lightweight, general-purpose, and optimized for 4GB VRAM hardware**.  
+It introduces a **Hallucination Vulnerability Index (HVI)** for calibrated detection and uses dynamic knowledge graphs (KG) for efficient correction.
 
-## Key Components
+## Pipeline Overview  
 
-1. **Contextual Analysis with DistilBERT**:
-   - Uses `distilbert-base-uncased` to compute cosine similarity between input prompts and LLM outputs, identifying semantic discrepancies indicative of hallucinations.
-   - Optimized for 4GB VRAM using mixed precision training (`torch.cuda.amp`) and batch sizes ≤ 8.
+### 1. Input  
 
-2. **Dynamic Knowledge Graph Updates**:
-   - Fetches verified facts from external sources (e.g., Wikipedia API) and caches them in `models/cache/kg_cache.json` to reduce latency.
-   - Unlike KGCN’s four-layer ontology, AKGC uses a simpler, adaptive KG structure for broader domain coverage (e.g., science, history).
+- User query or prompt `P`  
+- Initial LLM-generated response `O`  
 
-3. **Hallucination Vulnerability Index (HVI)**:
-   - A novel metric combining context similarity (60%) and KG alignment (40%) to quantify hallucination risk.
-   - Threshold-based detection (e.g., HVI < 0.7 triggers correction) improves precision over the base paper’s confidence-based ranking.
+### 2. Entity Extraction  
 
-4. **Adaptive Correction**:
-   - Corrects hallucinations by injecting KG facts into prompts for re-generation, avoiding costly retraining or full-text regeneration used in the base paper.
-   - Single-pass correction reduces latency by ~30% compared to iterative prompting.
+- Extract entities from both `P` and `O` using NER.  
+- Example:  
+  - `P`: *"What is the capital of France?"*  
+  - `O`: *"The capital of France is Florida."*  
+  - Extracted entities: `France`, `Florida`  
 
-## Implementation Strategy
+### 3. Knowledge Graph Retrieval  
 
-- **Code**: Implemented in `src/akgc_algorithm.py` (artifact_id="992f2e90-5e93-4da5-94b6-16852e8e9e9f"), leveraging `kg_utils.py` for KG updates and `metrics.py` for HVI.
-- **Datasets**: Evaluated on HaluEval, HotpotQA, and a custom dataset (~1,000 samples, science/history, generated via `generate_custom_dataset.py`).
-- **Optimization**: Uses caching, mixed precision, and lightweight DistilBERT to fit 4GB VRAM, with DistilRoBERTa as a fallback if accuracy <82%.
-- **Evaluation**: Targets >82% accuracy, ROUGE-L >0.75, BERTScore >0.88, and validated HVI via human annotation (~100 samples), using `evaluate.py`.
+- Retrieve related facts for extracted entities from a **local, cached KG** (Wikipedia/Wikidata snapshot).  
+- Use FAISS/HNSW indexing for sub-50 ms retrieval.  
+- Example fact: `France – hasCapital – Paris`  
 
-## Novelty
+### 4. Contextual Similarity Check  
 
-- **Lightweight Design**: Unlike KGCN’s complex graph neural network, AKGC uses DistilBERT for efficiency, enabling deployment on mid-range hardware.
-- **Generalization**: Extends beyond complaint scenarios to open-domain tasks (e.g., QA, dialogue), unlike the base paper’s domain-specific focus.
-- **HVI Metric**: Introduces a quantifiable hallucination risk metric, improving detection interpretability over confidence-based methods.
-- **Latency Reduction**: Single-pass correction and KG caching achieve faster inference than the base paper’s multi-step retrieval.
+- Compute embeddings for `P` and `O` using **DistilBERT**.  
+- Calculate **cosine similarity** → `S_context`.  
+- Low similarity → potential hallucination.  
+
+### 5. Knowledge Alignment Check  
+
+- Compute embeddings for `O` and retrieved facts `F(E)`.  
+- Calculate **cosine similarity** → `S_kg`.  
+- Low alignment → response contradicts KG.  
+
+### 6. Hallucination Vulnerability Index (HVI)
+
+- Compute hallucination risk score:  
+HVI = α × S_context + (1 – α) × S_kg
+- α ≈ 0.6 (calibrated on dev set)  
+- HVI ∈ [0,1]  
+
+- Threshold τ:  
+- `HVI ≥ τ` → reliable  
+- `HVI < τ` → hallucination suspected  
+
+### 7. Decision Policy
+
+- **Pass-through:** if `HVI ≥ τ`, return `O`.  
+- **Refuse:** if `HVI < τ` but no reliable KG fact, output:  
+*"I cannot verify this information with high confidence."*  
+- **Correct:** if `HVI < τ` and KG fact exists, regenerate:  
+
+Example fact-injection prompt
+
+```bash
+Question: What is the capital of France?
+Retrieved Fact: The capital of France is Paris.
+Please provide a corrected response.
+```
+
+### 8. Output  
+
+- Final response `O*` (pass, refuse, or corrected).  
+- Log metadata:  
+- HVI score  
+- Decision taken  
+- KG facts used  
+
+## Efficiency Optimizations  
+
+- Mixed precision (`torch.cuda.amp`) → reduce VRAM usage.  
+- KG pruning → keep KG ≤ 500 MB for stability.  
+- Caching → avoid repeated network calls.  
+- Single-pass correction → latency <300 ms (p50).  
+
+## Evaluation Strategy  
+
+- **Detection:** AUROC, AUPRC, calibration error of HVI vs baselines.  
+- **Correction:** FactScore, human-annotated factual accuracy.  
+- **Latency & Memory:** Benchmark p50/p95 on 4GB GPU.  
+- **Generalization:** Evaluate across complaints, science, geography, history.  
+
+## Novelty vs KGCN  
+
+- **Lightweight:** DistilBERT + FAISS instead of GCN layers.  
+- **Calibrated risk metric:** HVI provides interpretability.  
+- **Latency-bounded:** Designed for <300 ms response on consumer GPUs.  
+- **Structured policy:** Outputs *pass/refuse/correct* instead of opaque ranking.  
+- **Multi-domain:** Not restricted to complaints; supports open-domain QA.  

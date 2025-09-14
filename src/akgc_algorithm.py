@@ -5,6 +5,7 @@ from transformers import DistilBertModel, DistilBertTokenizer, AutoModelForCausa
 from utils.metrics import compute_hvi, compute_accuracy, compute_rouge_l, compute_bertscore
 import requests
 from torch.cuda.amp import autocast, GradScaler
+from transformers import pipeline
 
 def load_config(path="src/utils/config.yaml"):
     with open(path, "r") as f:
@@ -158,7 +159,6 @@ def normalize_entity_name(entity):
         # Return title case
         return entity.title()
 
-<<<<<<< HEAD
 def generate_contextual_facts(prompt, entity):
     """Generate contextual facts based on the prompt and entity."""
     facts = []
@@ -272,8 +272,6 @@ def generate_contextual_facts(prompt, entity):
     
     return facts
 
-=======
->>>>>>> 0aea545 (Update README.md to provide comprehensive documentation for the Adaptive Knowledge-Guided Correction (AKGC) framework, including installation instructions, usage examples, performance results, architecture details, and contribution guidelines.)
 def fetch_kg_data(entity):
     # Import and use the fixed KG utils
     from utils.kg_utils import fetch_kg_data as kg_fetch
@@ -313,15 +311,34 @@ def generate_llm_response(llm, llm_tokenizer, prompt, device, max_length=64):
     response = llm_tokenizer.decode(outputs[0], skip_special_tokens=True)
     return response
 
+def extract_entities(prompt, response):
+    """Extract entities from prompt and response using NER pipeline."""
+    ner_pipeline = pipeline("ner", model="dbmdz/bert-large-cased-finetuned-conll03-english", aggregation_strategy="simple")
+    
+    # Extract from prompt
+    prompt_entities = set()
+    prompt_ner = ner_pipeline(prompt)
+    for ent in prompt_ner:
+        prompt_entities.add(ent['word'])
+    
+    # Extract from response
+    response_entities = set()
+    response_ner = ner_pipeline(response)
+    for ent in response_ner:
+        response_entities.add(ent['word'])
+    
+    # Combine and normalize
+    all_entities = prompt_entities.union(response_entities)
+    normalized_entities = [normalize_entity_name(ent) for ent in all_entities if ent.isalpha() or ' ' in ent]
+    return list(set(normalized_entities))  # Unique
+
 def adaptive_correction(model, tokenizer, llm, llm_tokenizer, prompt, device, sim_threshold=0.8, hvi_threshold=0.7):
     # Generate initial response using LLM
     response = generate_llm_response(llm, llm_tokenizer, prompt, device)
     # Compute context similarity
     similarity = compute_context_similarity(model, tokenizer, prompt, response, device)
-    # Extract entity/topic for KG query
-    entity = extract_entity(prompt)
-    kg_facts = fetch_kg_data(entity)
-<<<<<<< HEAD
+    # Extract entities from prompt and response
+    entities = extract_entities(prompt, response)
     # Enhanced fallback: if no KG facts, try to generate more
     if not kg_facts or all("not available" in fact.lower() for fact in kg_facts):
         # Try to get more specific facts based on the prompt context
@@ -330,11 +347,6 @@ def adaptive_correction(model, tokenizer, llm, llm_tokenizer, prompt, device, si
             kg_facts = context_facts
         else:
             kg_facts = [f"Based on available knowledge: {entity} is a known entity, but specific facts may need verification."]
-=======
-    # Generic fallback: if no KG facts, use entity-aware message
-    if not kg_facts:
-        kg_facts = [f"No verified facts found for {entity}."]
->>>>>>> 0aea545 (Update README.md to provide comprehensive documentation for the Adaptive Knowledge-Guided Correction (AKGC) framework, including installation instructions, usage examples, performance results, architecture details, and contribution guidelines.)
     # Compute HVI
     hvi = compute_hvi(similarity, kg_facts, response)
     factual = True
@@ -412,4 +424,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-## Removed duplicate functions and second main block. All logic is now handled in the main() function above. 
+## Removed duplicate functions and second main block. All logic is now handled in the main() function above.

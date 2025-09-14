@@ -3,7 +3,7 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-1.13.1-red.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Status: Production Ready](https://img.shields.io/badge/Status-Production%20Ready-green.svg)]()
+[![Status: Production Ready](https://img.shields.io/badge/Status-Production%20Ready-green.svg)]
 
 > **A lightweight, real-time framework for detecting and correcting hallucinations in Large Language Models using DistilBERT, dynamic knowledge graphs, and a novel Hallucination Vulnerability Index (HVI).**
 
@@ -39,21 +39,24 @@ AKGC is a breakthrough framework that addresses the critical problem of hallucin
 #### ✅ Successful Corrections
 
 **Geography:**
-```
+
+```bash
 Input:  "The capital of France is London."
 Output: "The capital of France is Paris."
 HVI:    0.800 | Corrected: True | Accuracy: 100%
 ```
 
 **Science:**
-```
+
+```bash
 Input:  "The chemical symbol for gold is Ag."
 Output: "Information about Symbol For Gold Is Ag is not available in the knowledge base."
 HVI:    0.800 | Corrected: True | Accuracy: 0%
 ```
 
 **History:**
-```
+
+```bash
 Input:  "Napoleon Bonaparte was born in Germany."
 Output: "Napoleon Bonaparte was a French military and political leader."
 HVI:    0.657 | Corrected: True | Accuracy: 0%
@@ -126,17 +129,20 @@ curl -X POST http://localhost:5000/detect \
 ### Hallucination Vulnerability Index (HVI)
 
 The HVI is computed as:
-```
+
+```bash
 HVI = 0.6 × S_context + 0.4 × S_kg
 ```
 
 Where:
+
 - `S_context`: Cosine similarity between input and output embeddings
 - `S_kg`: Knowledge graph alignment score
 
 ### Correction Strategy
 
 When HVI < threshold (default: 0.7):
+
 1. Extract relevant entity from the prompt
 2. Fetch verified facts from knowledge graph
 3. Select most appropriate fact for correction
@@ -144,7 +150,7 @@ When HVI < threshold (default: 0.7):
 
 ## 📁 Project Structure
 
-```
+```bash
 Adaptive-Knowledge-Guided-Correction/
 ├── src/
 │   ├── akgc_algorithm.py          # Core algorithm implementation
@@ -248,11 +254,13 @@ docker run -p 5000:5000 akgc-api
 ## 📊 API Endpoints
 
 ### Health Check
+
 ```bash
 GET /health
 ```
 
 ### Single Text Detection
+
 ```bash
 POST /detect
 {
@@ -262,6 +270,7 @@ POST /detect
 ```
 
 ### Batch Detection
+
 ```bash
 POST /batch_detect
 {
@@ -271,6 +280,7 @@ POST /batch_detect
 ```
 
 ### Evaluation with Ground Truth
+
 ```bash
 POST /evaluate
 {
@@ -283,11 +293,13 @@ POST /evaluate
 ## 📈 Performance Optimization
 
 ### Memory Optimization
+
 - **Mixed Precision**: Half-precision for 4GB VRAM constraint
 - **Model Caching**: Efficient model loading and caching
 - **Batch Processing**: Optimized batch operations
 
 ### Speed Optimization
+
 - **Compiled Regex**: Pre-compiled entity extraction patterns
 - **Knowledge Graph Caching**: Intelligent fact caching
 - **Single-Pass Correction**: Reduced latency by 30%
@@ -356,6 +368,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🔮 Roadmap
 
 ### Phase 3 (Future)
+
 - [ ] Multi-language support
 - [ ] Advanced knowledge graph integration
 - [ ] Real-time streaming support
@@ -363,11 +376,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Advanced evaluation metrics
 
 ### Phase 4 (Long-term)
+
 - [ ] Domain-specific fine-tuning
 - [ ] Federated learning support
 - [ ] Edge deployment optimization
 - [ ] Commercial API service
-
----
 
 **Status**: ✅ Production Ready | **Version**: 1.0 | **Last Updated**: September 2025
