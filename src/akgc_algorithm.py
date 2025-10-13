@@ -337,8 +337,13 @@ def adaptive_correction(model, tokenizer, llm, llm_tokenizer, prompt, device, si
     response = generate_llm_response(llm, llm_tokenizer, prompt, device)
     # Compute context similarity
     similarity = compute_context_similarity(model, tokenizer, prompt, response, device)
-    # Extract entities from prompt and response
-    entities = extract_entities(prompt, response)
+    
+    # Extract primary entity from the prompt
+    entity = extract_entity(prompt)
+    
+    # Fetch knowledge graph facts for the entity
+    kg_facts = fetch_kg_data(entity)
+    
     # Enhanced fallback: if no KG facts, try to generate more
     if not kg_facts or all("not available" in fact.lower() for fact in kg_facts):
         # Try to get more specific facts based on the prompt context
@@ -354,10 +359,23 @@ def adaptive_correction(model, tokenizer, llm, llm_tokenizer, prompt, device, si
     if hvi < hvi_threshold or not any(fact.lower() in response.lower() for fact in kg_facts):
         factual = False
         
-        # Direct correction using KG facts
+        # Smart fact selection based on prompt content
         correct_fact = None
+        prompt_lower = prompt.lower()
+        
+        # Look for facts matching the prompt context
         for fact in kg_facts:
-            if "capital" in fact.lower() and "paris" in fact.lower():
+            fact_lower = fact.lower()
+            if "capital" in prompt_lower and "capital" in fact_lower:
+                correct_fact = fact
+                break
+            elif "element" in prompt_lower and "element" in fact_lower:
+                correct_fact = fact
+                break
+            elif "war" in prompt_lower and "war" in fact_lower:
+                correct_fact = fact
+                break
+            elif entity.lower() in fact_lower:
                 correct_fact = fact
                 break
         
