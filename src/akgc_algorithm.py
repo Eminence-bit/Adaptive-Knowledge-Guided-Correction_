@@ -381,8 +381,43 @@ def adaptive_correction(model, tokenizer, llm, llm_tokenizer, prompt, device, si
     # Compute HVI
     hvi = compute_hvi(similarity, kg_facts, response)
     factual = True
-    # Correction logic: if HVI is low or KG facts not in response, re-generate
-    if hvi < hvi_threshold or not any(fact.lower() in response.lower() for fact in kg_facts):
+    
+    # Check if response is semantically supported by KG facts
+    # Extract key terms from response and KG facts
+    stopwords = {'the', 'is', 'are', 'was', 'were', 'been', 'have', 'has', 'had', 
+                'this', 'that', 'with', 'from', 'for', 'and', 'or', 'but', 'a', 'an'}
+    response_words = set(word.lower().strip('.,;:!?') for word in response.split() 
+                        if len(word) > 2 and word.lower() not in stopwords)
+    
+    # Check if response has strong overlap with any KG fact AND no contradictions
+    kg_supports_response = False
+    has_contradiction = False
+    
+    for fact in kg_facts:
+        if "not available" in fact.lower():
+            continue
+        fact_words = set(word.lower().strip('.,;:!?') for word in fact.split() 
+                        if len(word) > 2 and word.lower() not in stopwords)
+        overlap = len(response_words & fact_words)
+        overlap_ratio = overlap / max(len(response_words), 1)
+        
+        # Check for contradiction: if facts contain entity names not in response
+        # For example: "capital is Paris" vs "capital is Florida"
+        fact_entities = fact_words - response_words
+        response_entities = response_words - fact_words
+        
+        # If we have shared context (capital, country) but different entities, it's a contradiction
+        if overlap >= 2 and len(fact_entities) > 0 and len(response_entities) > 0:
+            # Check if it's a proper noun mismatch (capitalized words)
+            has_contradiction = True
+        
+        # If significant overlap (>60%) and no clear contradiction, consider supported
+        if overlap_ratio > 0.6 and not has_contradiction:
+            kg_supports_response = True
+            break
+    
+    # Correction logic: Apply correction only if HVI is low AND no KG support
+    if hvi < hvi_threshold and not kg_supports_response:
         factual = False
         
         # Smart fact selection based on prompt content
@@ -391,11 +426,16 @@ def adaptive_correction(model, tokenizer, llm, llm_tokenizer, prompt, device, si
         
         # Look for facts matching the prompt context
         for fact in kg_facts:
+            if "not available" in fact.lower():
+                continue
             fact_lower = fact.lower()
             if "capital" in prompt_lower and "capital" in fact_lower:
                 correct_fact = fact
                 break
             elif "element" in prompt_lower and "element" in fact_lower:
+                correct_fact = fact
+                break
+            elif "atomic number" in prompt_lower and "atomic number" in fact_lower:
                 correct_fact = fact
                 break
             elif "war" in prompt_lower and "war" in fact_lower:
@@ -410,11 +450,13 @@ def adaptive_correction(model, tokenizer, llm, llm_tokenizer, prompt, device, si
         else:
             # Try to find any relevant fact
             for fact in kg_facts:
-                if entity.lower() in fact.lower():
+                if "not available" not in fact.lower() and entity.lower() in fact.lower():
                     response = fact
                     break
             else:
-                response = f"Based on available facts: {'. '.join(kg_facts[:2])}"
+                valid_facts = [f for f in kg_facts if "not available" not in f.lower()]
+                if valid_facts:
+                    response = f"Based on available facts: {'. '.join(valid_facts[:2])}"
     
     # Post-process: ensure we have a meaningful response
     if not response or response.strip() == prompt.strip():

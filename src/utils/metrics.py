@@ -41,32 +41,46 @@ def compute_hvi(similarity, kg_facts, output_text):
     # Compute knowledge grounding score with partial matching
     kg_score = 0.0
     if kg_facts:
-        # Check for exact substring matches
-        exact_matches = sum(1 for fact in kg_facts if fact.lower() in output_lower)
+        # Filter out "not available" facts
+        valid_facts = [f for f in kg_facts if "not available" not in f.lower()]
         
-        # Check for partial matches (key terms from facts present in output)
-        partial_matches = 0
-        for fact in kg_facts:
-            # Extract key words from fact (excluding common words)
-            fact_words = set(word.lower() for word in fact.split() 
-                           if len(word) > 3 and word.lower() not in 
-                           ['the', 'is', 'are', 'was', 'were', 'been', 'have', 'has', 'had'])
-            output_words = set(word.lower() for word in output_text.split())
+        if not valid_facts:
+            # No valid facts, assume medium confidence
+            kg_score = 0.5
+        else:
+            # Check for exact substring matches
+            exact_matches = sum(1 for fact in valid_facts if fact.lower() in output_lower)
             
-            # Calculate overlap
-            overlap = len(fact_words & output_words)
-            if overlap > 0:
-                partial_matches += overlap / max(len(fact_words), 1)
-        
-        # Normalize scores
-        max_exact = len(kg_facts)
-        max_partial = len(kg_facts)
-        
-        exact_score = min(exact_matches / max_exact, 1.0) if max_exact > 0 else 0.0
-        partial_score = min(partial_matches / max_partial, 1.0) if max_partial > 0 else 0.0
-        
-        # Weight exact matches more heavily than partial matches
-        kg_score = 0.7 * exact_score + 0.3 * partial_score
+            # Check for partial matches (key terms from facts present in output)
+            partial_match_scores = []
+            for fact in valid_facts:
+                # Extract key words from fact (excluding common words)
+                stopwords = {'the', 'is', 'are', 'was', 'were', 'been', 'have', 'has', 'had', 
+                           'this', 'that', 'with', 'from', 'for', 'and', 'or', 'but'}
+                
+                fact_words = set(word.lower().strip('.,;:!?()[]{}') for word in fact.split() 
+                               if len(word) > 2 and word.lower() not in stopwords)
+                output_words = set(word.lower().strip('.,;:!?()[]{}') for word in output_text.split() 
+                                 if len(word) > 2 and word.lower() not in stopwords)
+                
+                # Calculate overlap
+                if len(fact_words) > 0:
+                    overlap = len(fact_words & output_words)
+                    overlap_ratio = overlap / len(fact_words)
+                    partial_match_scores.append(overlap_ratio)
+            
+            # Normalize scores
+            exact_score = min(exact_matches / len(valid_facts), 1.0)
+            partial_score = max(partial_match_scores) if partial_match_scores else 0.0
+            
+            # If we have high word overlap, boost the score
+            # This helps catch cases where the output is factually correct
+            if partial_score > 0.5:
+                # Strong partial match indicates factual content
+                kg_score = 0.5 * exact_score + 0.5 * partial_score
+            else:
+                # Weight exact matches more heavily when partial is low
+                kg_score = 0.7 * exact_score + 0.3 * partial_score
     else:
         # No KG facts available, assume medium confidence
         kg_score = 0.5

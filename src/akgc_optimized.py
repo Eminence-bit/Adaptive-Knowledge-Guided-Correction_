@@ -232,16 +232,49 @@ class OptimizedAKGC:
         
         factual = True
         
-        # Enhanced correction logic
-        if hvi < hvi_threshold or not any(fact.lower() in response.lower() for fact in kg_facts):
+        # Check if response is semantically supported by KG facts
+        stopwords = {'the', 'is', 'are', 'was', 'were', 'been', 'have', 'has', 'had', 
+                    'this', 'that', 'with', 'from', 'for', 'and', 'or', 'but', 'a', 'an'}
+        response_words = set(word.lower().strip('.,;:!?') for word in response.split() 
+                            if len(word) > 2 and word.lower() not in stopwords)
+        
+        # Check if response has strong overlap with any KG fact AND no contradictions
+        kg_supports_response = False
+        has_contradiction = False
+        
+        for fact in kg_facts:
+            if "not available" in fact.lower():
+                continue
+            fact_words = set(word.lower().strip('.,;:!?') for word in fact.split() 
+                            if len(word) > 2 and word.lower() not in stopwords)
+            overlap = len(response_words & fact_words)
+            overlap_ratio = overlap / max(len(response_words), 1)
+            
+            # Check for contradiction: if facts contain entity names not in response
+            fact_entities = fact_words - response_words
+            response_entities = response_words - fact_words
+            
+            # If we have shared context but different entities, it's a contradiction
+            if overlap >= 2 and len(fact_entities) > 0 and len(response_entities) > 0:
+                has_contradiction = True
+            
+            # If significant overlap (>60%) and no clear contradiction, consider supported
+            if overlap_ratio > 0.6 and not has_contradiction:
+                kg_supports_response = True
+                break
+        
+        # Enhanced correction logic: Apply correction only if HVI is low AND no KG support
+        if hvi < hvi_threshold and not kg_supports_response:
             factual = False
             
             # Smart fact selection based on prompt content
             best_fact = self.select_best_fact(prompt, kg_facts)
-            if best_fact:
+            if best_fact and "not available" not in best_fact.lower():
                 response = best_fact
             else:
-                response = f"Based on available facts: {'. '.join(kg_facts[:2])}"
+                valid_facts = [f for f in kg_facts if "not available" not in f.lower()]
+                if valid_facts:
+                    response = f"Based on available facts: {'. '.join(valid_facts[:2])}"
         
         return response, factual, hvi
     
