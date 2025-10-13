@@ -37,7 +37,7 @@ This document details the improvements made to the Adaptive Knowledge-Guided Cor
 ```python
 # Special pattern matching for complex entities
 special_patterns = [
-    r"World War (I{1,3}|[12])",  # Handles WWI, WWII, etc.
+    r"World War (I{1,2}|[12])",  # Handles WWI, WWII, World War 1, World War 2
     r"(Napoleon Bonaparte|Julius Caesar|...)",  # Famous figures
 ]
 
@@ -191,14 +191,16 @@ for fact in kg_facts:
 
 ### 2. Compiled Regex Patterns
 ```python
-def compile_entity_patterns(self):
-    """Compile patterns once for efficient reuse"""
-    patterns = {
-        'geo': [re.compile(r"capital of ([A-Za-z ]+?)...", re.IGNORECASE)],
-        'science': [re.compile(r"element ([A-Za-z ]+)", re.IGNORECASE)],
-        'history': [re.compile(r"war ([A-Za-z ]+)", re.IGNORECASE)]
-    }
-    return patterns
+# Method in OptimizedAKGC class
+class OptimizedAKGC:
+    def compile_entity_patterns(self):
+        """Compile patterns once for efficient reuse"""
+        patterns = {
+            'geo': [re.compile(r"capital of ([A-Za-z ]+?)...", re.IGNORECASE)],
+            'science': [re.compile(r"element ([A-Za-z ]+)", re.IGNORECASE)],
+            'history': [re.compile(r"war ([A-Za-z ]+)", re.IGNORECASE)]
+        }
+        return patterns
 ```
 
 ### 3. Stopword Filtering
@@ -267,8 +269,10 @@ response, factual, hvi = adaptive_correction(
 
 print(f"Corrected: {response}")
 # Output: "The capital of France is Paris."
+
 print(f"Factual: {factual}")  
 # Output: False
+
 print(f"HVI: {hvi:.3f}")
 # Output: 0.520
 ```

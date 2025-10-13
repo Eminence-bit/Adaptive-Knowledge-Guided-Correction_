@@ -86,7 +86,7 @@ class OptimizedAKGC:
         """Optimized entity extraction using compiled patterns."""
         # Check for special multi-word entities first
         special_patterns = [
-            (re.compile(r"World War (I{1,3}|[12])", re.IGNORECASE), "world_war"),
+            (re.compile(r"World War (I{1,2}|[12])", re.IGNORECASE), "world_war"),  # WWI, WWII only
             (re.compile(r"Napoleon Bonaparte", re.IGNORECASE), "name"),
             (re.compile(r"Julius Caesar", re.IGNORECASE), "name"),
         ]

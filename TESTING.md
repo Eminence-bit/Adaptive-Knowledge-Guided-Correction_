@@ -154,14 +154,17 @@ Issue: "west" appears in both incorrect prompt and correct fact
 
 **Solution Needed:** Position-aware or dependency-based semantic analysis.
 
-## Running Tests Without Internet
+## Running Tests With Limited Internet Access
 
-The tests are designed to work offline:
-- Wikipedia API calls fail gracefully
-- System falls back to hardcoded facts
-- Caching preserves previous API results
+The tests handle network issues gracefully:
+- Wikipedia API calls fail gracefully and fall back to hardcoded facts
+- System uses hardcoded fact database as primary fallback
+- Caching preserves previous API results for faster subsequent runs
 
-**Note:** Initial run requires internet to fetch facts. Subsequent runs use cache.
+**Network Requirements:**
+- **First run:** Internet helpful but not required (uses hardcoded facts as fallback)
+- **Subsequent runs:** Fully offline capable if cache populated
+- **No internet:** Tests still run using hardcoded knowledge base
 
 ## Performance Benchmarks
 
@@ -252,13 +255,17 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: '3.12'
+          python-version: '3.12.x'
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Run component tests
-        run: python3 test_akgc_logic.py
+        run: |
+          set -e
+          python3 test_akgc_logic.py || exit 1
       - name: Run comprehensive tests
-        run: python3 test_akgc_comprehensive.py
+        run: |
+          set -e
+          python3 test_akgc_comprehensive.py || exit 1
 ```
 
 ## Future Test Improvements

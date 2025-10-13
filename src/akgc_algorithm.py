@@ -29,7 +29,7 @@ def extract_entity(prompt):
     
     # Special patterns for multi-word entities (check these first)
     special_patterns = [
-        r"World War (I{1,3}|[12])",  # World War I, II, III, 1, 2, etc.
+        r"World War (I{1,2}|[12])",  # World War I, II, 1, 2 (not III as it didn't happen)
         r"(Napoleon Bonaparte|Julius Caesar|Albert Einstein|William Shakespeare)",
     ]
     
