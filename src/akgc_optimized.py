@@ -83,7 +83,17 @@ class OptimizedAKGC:
         return patterns
     
     def extract_entity_optimized(self, prompt: str) -> str:
-        """Optimized entity extraction using compiled patterns."""
+        """
+        Extracts and returns a canonical entity name referenced in the prompt.
+        
+        Performs prioritized entity detection: checks for special multi-word named entities (e.g., World War I/II, Napoleon Bonaparte, Julius Caesar), astronomy and simple science patterns, then applies category-specific compiled regex patterns. Extracted matches are cleaned (strips leading articles, trailing verb phrases) and normalized to a canonical form. If no pattern matches, falls back to a heuristic that selects the first meaningful title-cased unigram or bigram; if the prompt is empty, returns "Unknown".
+        
+        Parameters:
+            prompt (str): Text prompt from which to extract the entity.
+        
+        Returns:
+            entity (str): Normalized canonical entity name extracted from the prompt.
+        """
         # Check for special multi-word entities first
         special_patterns = [
             (re.compile(r"World War (I{1,2}|[12])", re.IGNORECASE), "world_war"),  # WWI, WWII only
@@ -213,7 +223,22 @@ class OptimizedAKGC:
     def adaptive_correction_optimized(self, prompt: str, 
                                     sim_threshold: float = 0.8, 
                                     hvi_threshold: float = 0.7) -> Tuple[str, bool, float]:
-        """Optimized adaptive correction with enhanced logic."""
+        """
+                                    Apply KG-aware adaptive correction to an LLM-generated response for a given prompt.
+                                    
+                                    Generates an initial response, evaluates its context alignment and a hallucination-verification index (HVI) against retrieved knowledge-graph (KG) facts, and replaces the response with a KG-supported fact only when the HVI is below the provided threshold and the KG does not sufficiently support the generated text.
+                                    
+                                    Parameters:
+                                        prompt (str): User prompt to generate and evaluate a response for.
+                                        sim_threshold (float): Similarity threshold used for contextual checks (controls sensitivity to input-output alignment).
+                                        hvi_threshold (float): HVI threshold below which correction is considered and applied if KG support is insufficient.
+                                    
+                                    Returns:
+                                        tuple:
+                                            response (str): Final response text — the original LLM output or a KG-supported correction.
+                                            factual (bool): `True` if the returned response is considered supported/factual, `False` if it was replaced due to low HVI and lack of KG support.
+                                            hvi (float): Computed hallucination-verification index score for the original LLM response.
+                                    """
         # Generate initial response
         response = self.generate_llm_response_optimized(prompt)
         
@@ -280,12 +305,16 @@ class OptimizedAKGC:
     
     def select_best_fact(self, prompt: str, kg_facts: List[str]) -> str:
         """
-        Select the most relevant fact for correction using semantic matching.
+        Selects the most relevant knowledge-graph fact to correct or support a prompt.
         
-        This implements a multi-stage selection process:
-        1. Direct keyword matching for high-priority terms
-        2. Word overlap scoring
-        3. Semantic relevance based on shared entities
+        Performs a three-stage selection: (1) prefer facts matching high-priority keywords present in the prompt, (2) choose the fact with the highest word-overlap score with the prompt, (3) fall back to the first fact if no better match is found.
+        
+        Parameters:
+            prompt (str): The user prompt or generated response used to determine relevance.
+            kg_facts (List[str]): Candidate facts retrieved from the knowledge graph.
+        
+        Returns:
+            str or None: The most relevant fact from kg_facts, or `None` if kg_facts is empty.
         """
         if not kg_facts:
             return None
@@ -334,7 +363,19 @@ class OptimizedAKGC:
         return best_fact if best_fact else kg_facts[0]
     
     def batch_process(self, prompts: List[str]) -> List[Dict]:
-        """Process multiple prompts in batch for efficiency."""
+        """
+        Process a list of prompts and produce a response, a factuality flag, and an HVI score for each prompt.
+        
+        Parameters:
+            prompts (List[str]): Sequence of input prompts to be processed.
+        
+        Returns:
+            results (List[Dict]): List of dictionaries, one per prompt, each containing:
+                - prompt (str): The original input prompt.
+                - response (str): The generated (possibly corrected) LLM response.
+                - factual (bool): `True` if the response is considered factually supported, `False` otherwise.
+                - hvi (float): The computed HVI/similarity score for the prompt–response pair.
+        """
         results = []
         
         for prompt in prompts:
