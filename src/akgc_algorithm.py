@@ -24,7 +24,17 @@ def load_model(model_name, device):
     return model, tokenizer
 
 def extract_entity(prompt):
-    """Enhanced entity extraction for multiple domains including science and history."""
+    """
+    Extracts and returns a single prominent entity referenced in a text prompt, normalized to a standardized name.
+    
+    The function detects entities across multiple domains (geography, science, history, astronomy/physics) and recognizes multi-word and special-case entities (e.g., historical figures, world wars). If domain-specific patterns fail, it falls back to extracting capitalized words or the first meaningful word from the prompt.
+    
+    Parameters:
+        prompt (str): The input text to analyze for an entity.
+    
+    Returns:
+        str: A normalized entity name suitable for downstream knowledge lookups or display.
+    """
     import re
     
     # Special patterns for multi-word entities (check these first)
@@ -360,6 +370,29 @@ def extract_entities(prompt, response):
 
 def adaptive_correction(model, tokenizer, llm, llm_tokenizer, prompt, device, sim_threshold=0.8, hvi_threshold=0.7):
     # Generate initial response using LLM
+    """
+    Generate an LLM response for a prompt, verify it against knowledge-graph facts, and apply KG-backed corrections when the combined knowledge-verification index is below a threshold.
+    
+    This function:
+    - Produces an initial response using the provided LLM and computes semantic similarity between the prompt and the response.
+    - Extracts a primary entity from the prompt and retrieves or generates relevant knowledge-graph (KG) facts.
+    - Computes a knowledge-verification index (HVI) that combines contextual similarity and KG evidence.
+    - Checks whether the LLM response is semantically supported by KG facts and detects simple contradictions.
+    - If the HVI is below `hvi_threshold` and the KG does not support the response, replaces or augments the response with a relevant KG-backed fact or a concise summary of available facts.
+    - Ensures the returned response is meaningful (falls back to KG facts summary when necessary).
+    
+    Parameters:
+        prompt (str): The input prompt to generate and validate a response for.
+        device (str): Compute device identifier (e.g., "cpu" or "cuda") used for model execution.
+        sim_threshold (float): Similarity threshold used internally for contextual checks (default 0.8).
+        hvi_threshold (float): HVI threshold below which KG-backed correction is applied (default 0.7).
+    
+    Returns:
+        tuple:
+            response (str): Final response text (original, corrected, or KG-based fallback).
+            factual (bool): `True` if no correction was applied (response considered KG-supported), `False` if correction was applied.
+            hvi (float): Computed knowledge-verification index indicating alignment between prompt, response, and KG facts.
+    """
     response = generate_llm_response(llm, llm_tokenizer, prompt, device)
     # Compute context similarity
     similarity = compute_context_similarity(model, tokenizer, prompt, response, device)

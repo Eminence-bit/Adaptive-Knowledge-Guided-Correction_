@@ -3,7 +3,18 @@ import json
 import os
 
 def fetch_kg_data(query, cache_path="models/cache/kg_cache.json"):
-    """Fetch and cache knowledge graph facts from multiple verified sources."""
+    """
+    Retrieve facts for a query from Wikipedia and persist the results in a local cache.
+    
+    Attempts to fetch a short summary and description for the query from the Wikipedia REST API. If the remote fetch fails or returns a non-200 status, the function uses predefined hardcoded facts as a fallback. In all cases the resulting list of fact strings is saved to the JSON cache at `cache_path` and returned.
+    
+    Parameters:
+        query (str): The entity or topic to look up.
+        cache_path (str): Path to a JSON file used to read/write cached query results. Defaults to "models/cache/kg_cache.json".
+    
+    Returns:
+        list: A list of fact strings for the query; may include a truncated Wikipedia extract, a "Description: ..." line, and/or hardcoded fallback facts.
+    """
     # Ensure cache directory exists
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
     
@@ -60,7 +71,17 @@ def fetch_kg_data(query, cache_path="models/cache/kg_cache.json"):
         return facts
 
 def get_hardcoded_facts(query):
-    """Get hardcoded facts for common entities as fallback."""
+    """
+    Return predefined factual statements for common entities as a fallback when external data is unavailable.
+    
+    Looks up `query` in an internal repository of common-entity facts using an exact match first, then a case-insensitive match. If no entry is found, returns a single-item list containing an informative message.
+    
+    Parameters:
+        query (str): The entity name to look up.
+    
+    Returns:
+        list[str]: A list of fact strings for the matched entity, or a single-item list with an informational message if no facts are available.
+    """
     facts_db = {
         # Geography
         "France": [

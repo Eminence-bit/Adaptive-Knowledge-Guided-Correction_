@@ -13,7 +13,16 @@ def compute_rouge_l(response, ground_truth):
     return scores["rougeL"].fmeasure
 
 def compute_bertscore(response, ground_truth):
-    """Compute BERTScore."""
+    """
+    Compute the BERTScore F1 between a generated response and a ground-truth reference.
+    
+    Parameters:
+        response (str): Generated text to evaluate.
+        ground_truth (str): Reference text to compare against.
+    
+    Returns:
+        float: BERTScore F1 value in the range [0.0, 1.0], where higher is better.
+    """
     P, R, F1 = score([response], [ground_truth], lang="en", model_type="distilbert-base-uncased")
     return F1.item()
 
