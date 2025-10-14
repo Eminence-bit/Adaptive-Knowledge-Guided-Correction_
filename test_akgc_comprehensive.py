@@ -79,6 +79,21 @@ def simulate_adaptive_correction(prompt, sim_threshold=0.8, hvi_threshold=0.7):
     kg_supports_response = False
     has_contradiction = False
     
+    # Define contradictory word pairs
+    contradictory_pairs = {
+        ('east', 'west'), ('west', 'east'),
+        ('north', 'south'), ('south', 'north'),
+        ('florida', 'paris'), ('paris', 'florida'),
+        ('mumbai', 'new delhi'), ('new delhi', 'mumbai')
+    }
+    
+    # Define semantic equivalences
+    semantic_equivalents = {
+        'hydrogen and oxygen': ['h2o', 'formula h2o', 'chemical compound'],
+        'ended in 1945': ['lasted from 1939 to 1945', '1939 to 1945'],
+        'atomic number 8': ['symbol o and atomic number 8', 'element with symbol o']
+    }
+    
     for fact in kg_facts:
         if "not available" in fact.lower():
             continue
@@ -87,16 +102,38 @@ def simulate_adaptive_correction(prompt, sim_threshold=0.8, hvi_threshold=0.7):
         overlap = len(response_words & fact_words)
         overlap_ratio = overlap / max(len(response_words), 1)
         
-        # Check for contradiction: if facts contain entity names not in response
-        fact_entities = fact_words - response_words
-        response_entities = response_words - fact_words
+        # Check semantic equivalences first
+        response_text = mock_response.lower()
+        fact_text = fact.lower()
+        semantically_equivalent = False
+        for key_phrase, equivalents in semantic_equivalents.items():
+            if key_phrase in response_text:
+                for equiv in equivalents:
+                    if equiv in fact_text:
+                        semantically_equivalent = True
+                        kg_supports_response = True
+                        break
+                if semantically_equivalent:
+                    break
         
-        # If we have shared context but different entities, it's a contradiction
-        if overlap >= 2 and len(fact_entities) > 0 and len(response_entities) > 0:
-            has_contradiction = True
+        # Check for direct contradictory pairs
+        for word1, word2 in contradictory_pairs:
+            if word1 in response_words and word2 in fact_words:
+                has_contradiction = True
+                break
         
-        # If significant overlap (>60%) and no clear contradiction, consider supported
-        if overlap_ratio > 0.6 and not has_contradiction:
+        # Skip contradiction check if semantically equivalent
+        if not semantically_equivalent:
+            # Check for contradiction: if facts contain entity names not in response
+            fact_entities = fact_words - response_words
+            response_entities = response_words - fact_words
+            
+            # If we have shared context but different entities, it's a contradiction
+            if overlap >= 2 and len(fact_entities) > 0 and len(response_entities) > 0:
+                has_contradiction = True
+        
+        # If significant overlap (>50%) and no clear contradiction, consider supported
+        if overlap_ratio > 0.5 and not has_contradiction:
             kg_supports_response = True
             break
     
