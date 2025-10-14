@@ -83,7 +83,47 @@ class OptimizedAKGC:
         return patterns
     
     def extract_entity_optimized(self, prompt: str) -> str:
-        """Optimized entity extraction using compiled patterns."""
+        """
+        Extracts and returns a canonical entity name referenced in the prompt.
+        
+        Performs prioritized entity detection: checks for special multi-word named entities (e.g., World War I/II, Napoleon Bonaparte, Julius Caesar), astronomy and simple science patterns, then applies category-specific compiled regex patterns. Extracted matches are cleaned (strips leading articles, trailing verb phrases) and normalized to a canonical form. If no pattern matches, falls back to a heuristic that selects the first meaningful title-cased unigram or bigram; if the prompt is empty, returns "Unknown".
+        
+        Parameters:
+            prompt (str): Text prompt from which to extract the entity.
+        
+        Returns:
+            entity (str): Normalized canonical entity name extracted from the prompt.
+        """
+        # Check for special multi-word entities first
+        special_patterns = [
+            (re.compile(r"World War (I{1,2}|[12])", re.IGNORECASE), "world_war"),  # WWI, WWII only
+            (re.compile(r"Napoleon Bonaparte", re.IGNORECASE), "name"),
+            (re.compile(r"Julius Caesar", re.IGNORECASE), "name"),
+        ]
+        
+        for pattern, ptype in special_patterns:
+            match = pattern.search(prompt)
+            if match:
+                if ptype == "world_war":
+                    roman = match.group(1).upper()
+                    return self.normalize_entity_name(f"World War {roman}")
+                return self.normalize_entity_name(match.group(0))
+        
+        # Check for astronomy patterns
+        if re.search(r"(?:the\s+)?sun\s+rises", prompt, re.IGNORECASE):
+            return self.normalize_entity_name("Sun")
+        if re.search(r"(?:the\s+)?moon\s+(?:is|orbits)", prompt, re.IGNORECASE):
+            return self.normalize_entity_name("Moon")
+        
+        # Check for science patterns (atomic number, elements, etc.)
+        science_match = re.search(r"([A-Z][a-z]+)\s+(?:is|has)\s+atomic\s+number", prompt)
+        if science_match:
+            return self.normalize_entity_name(science_match.group(1))
+        
+        science_match = re.search(r"([A-Z][a-z]+)\s+is\s+made\s+of", prompt)
+        if science_match:
+            return self.normalize_entity_name(science_match.group(1))
+        
         # Try each pattern category
         for category, patterns in self.entity_patterns.items():
             for pattern in patterns:
@@ -91,11 +131,16 @@ class OptimizedAKGC:
                 if match:
                     entity = match.group(1).strip()
                     entity = entity.replace("the ", "").replace("The ", "")
+                    # Remove trailing verbs
+                    entity = re.sub(r'\s+(is|was|has|ended|became|born).*$', '', entity, flags=re.IGNORECASE)
                     return self.normalize_entity_name(entity)
         
         # Fallback: extract first meaningful word
         words = prompt.split()
         for i, word in enumerate(words):
+            # Skip common articles and prepositions
+            if word.lower() in ["the", "a", "an", "of", "in", "on", "at"]:
+                continue
             if word.istitle() and len(word) > 2:
                 if i + 1 < len(words) and words[i + 1].istitle():
                     return self.normalize_entity_name(f"{word} {words[i + 1]}")
@@ -178,7 +223,22 @@ class OptimizedAKGC:
     def adaptive_correction_optimized(self, prompt: str, 
                                     sim_threshold: float = 0.8, 
                                     hvi_threshold: float = 0.7) -> Tuple[str, bool, float]:
-        """Optimized adaptive correction with enhanced logic."""
+        """
+                                    Apply KG-aware adaptive correction to an LLM-generated response for a given prompt.
+                                    
+                                    Generates an initial response, evaluates its context alignment and a hallucination-verification index (HVI) against retrieved knowledge-graph (KG) facts, and replaces the response with a KG-supported fact only when the HVI is below the provided threshold and the KG does not sufficiently support the generated text.
+                                    
+                                    Parameters:
+                                        prompt (str): User prompt to generate and evaluate a response for.
+                                        sim_threshold (float): Similarity threshold used for contextual checks (controls sensitivity to input-output alignment).
+                                        hvi_threshold (float): HVI threshold below which correction is considered and applied if KG support is insufficient.
+                                    
+                                    Returns:
+                                        tuple:
+                                            response (str): Final response text — the original LLM output or a KG-supported correction.
+                                            factual (bool): `True` if the returned response is considered supported/factual, `False` if it was replaced due to low HVI and lack of KG support.
+                                            hvi (float): Computed hallucination-verification index score for the original LLM response.
+                                    """
         # Generate initial response
         response = self.generate_llm_response_optimized(prompt)
         
@@ -197,44 +257,125 @@ class OptimizedAKGC:
         
         factual = True
         
-        # Enhanced correction logic
-        if hvi < hvi_threshold or not any(fact.lower() in response.lower() for fact in kg_facts):
+        # Check if response is semantically supported by KG facts
+        stopwords = {'the', 'is', 'are', 'was', 'were', 'been', 'have', 'has', 'had', 
+                    'this', 'that', 'with', 'from', 'for', 'and', 'or', 'but', 'a', 'an'}
+        response_words = set(word.lower().strip('.,;:!?') for word in response.split() 
+                            if len(word) > 2 and word.lower() not in stopwords)
+        
+        # Check if response has strong overlap with any KG fact AND no contradictions
+        kg_supports_response = False
+        has_contradiction = False
+        
+        for fact in kg_facts:
+            if "not available" in fact.lower():
+                continue
+            fact_words = set(word.lower().strip('.,;:!?') for word in fact.split() 
+                            if len(word) > 2 and word.lower() not in stopwords)
+            overlap = len(response_words & fact_words)
+            overlap_ratio = overlap / max(len(response_words), 1)
+            
+            # Check for contradiction: if facts contain entity names not in response
+            fact_entities = fact_words - response_words
+            response_entities = response_words - fact_words
+            
+            # If we have shared context but different entities, it's a contradiction
+            if overlap >= 2 and len(fact_entities) > 0 and len(response_entities) > 0:
+                has_contradiction = True
+            
+            # If significant overlap (>60%) and no clear contradiction, consider supported
+            if overlap_ratio > 0.6 and not has_contradiction:
+                kg_supports_response = True
+                break
+        
+        # Enhanced correction logic: Apply correction only if HVI is low AND no KG support
+        if hvi < hvi_threshold and not kg_supports_response:
             factual = False
             
             # Smart fact selection based on prompt content
             best_fact = self.select_best_fact(prompt, kg_facts)
-            if best_fact:
+            if best_fact and "not available" not in best_fact.lower():
                 response = best_fact
             else:
-                response = f"Based on available facts: {'. '.join(kg_facts[:2])}"
+                valid_facts = [f for f in kg_facts if "not available" not in f.lower()]
+                if valid_facts:
+                    response = f"Based on available facts: {'. '.join(valid_facts[:2])}"
         
         return response, factual, hvi
     
     def select_best_fact(self, prompt: str, kg_facts: List[str]) -> str:
-        """Select the most relevant fact for correction."""
+        """
+        Selects the most relevant knowledge-graph fact to correct or support a prompt.
+        
+        Performs a three-stage selection: (1) prefer facts matching high-priority keywords present in the prompt, (2) choose the fact with the highest word-overlap score with the prompt, (3) fall back to the first fact if no better match is found.
+        
+        Parameters:
+            prompt (str): The user prompt or generated response used to determine relevance.
+            kg_facts (List[str]): Candidate facts retrieved from the knowledge graph.
+        
+        Returns:
+            str or None: The most relevant fact from kg_facts, or `None` if kg_facts is empty.
+        """
+        if not kg_facts:
+            return None
+        
         prompt_lower = prompt.lower()
         
-        # Priority-based fact selection
+        # Stage 1: Priority keyword matching
+        priority_keywords = {
+            'capital': ['capital', 'city'],
+            'element': ['element', 'atomic', 'chemical'],
+            'war': ['war', 'battle', 'conflict'],
+            'born': ['born', 'birth'],
+            'ended': ['ended', 'finished'],
+            'number': ['number', 'atomic'],
+            'made': ['made', 'composed', 'consists'],
+        }
+        
+        for key, synonyms in priority_keywords.items():
+            if any(syn in prompt_lower for syn in synonyms):
+                for fact in kg_facts:
+                    fact_lower = fact.lower()
+                    if any(syn in fact_lower for syn in synonyms):
+                        return fact
+        
+        # Stage 2: Word overlap scoring
+        prompt_words = set(word.lower() for word in prompt.split() 
+                          if len(word) > 3 and word.lower() not in 
+                          ['the', 'is', 'are', 'was', 'were', 'been', 'have', 'has', 'had', 'this', 'that'])
+        
+        best_fact = None
+        best_score = 0
+        
         for fact in kg_facts:
-            fact_lower = fact.lower()
+            fact_words = set(word.lower() for word in fact.split() 
+                           if len(word) > 3 and word.lower() not in 
+                           ['the', 'is', 'are', 'was', 'were', 'been', 'have', 'has', 'had', 'this', 'that'])
             
-            # Check for direct matches
-            if "capital" in prompt_lower and "capital" in fact_lower:
-                return fact
-            if "element" in prompt_lower and "element" in fact_lower:
-                return fact
-            if "war" in prompt_lower and "war" in fact_lower:
-                return fact
+            overlap = len(prompt_words & fact_words)
+            score = overlap / max(len(prompt_words), 1)
+            
+            if score > best_score:
+                best_score = score
+                best_fact = fact
         
-        # Return first relevant fact
-        for fact in kg_facts:
-            if any(word in fact_lower for word in prompt_lower.split() if len(word) > 3):
-                return fact
-        
-        return kg_facts[0] if kg_facts else None
+        # Stage 3: Return best fact or first fact as fallback
+        return best_fact if best_fact else kg_facts[0]
     
     def batch_process(self, prompts: List[str]) -> List[Dict]:
-        """Process multiple prompts in batch for efficiency."""
+        """
+        Process a list of prompts and produce a response, a factuality flag, and an HVI score for each prompt.
+        
+        Parameters:
+            prompts (List[str]): Sequence of input prompts to be processed.
+        
+        Returns:
+            results (List[Dict]): List of dictionaries, one per prompt, each containing:
+                - prompt (str): The original input prompt.
+                - response (str): The generated (possibly corrected) LLM response.
+                - factual (bool): `True` if the response is considered factually supported, `False` otherwise.
+                - hvi (float): The computed HVI/similarity score for the prompt–response pair.
+        """
         results = []
         
         for prompt in prompts:

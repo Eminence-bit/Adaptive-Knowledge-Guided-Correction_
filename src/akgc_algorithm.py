@@ -24,8 +24,33 @@ def load_model(model_name, device):
     return model, tokenizer
 
 def extract_entity(prompt):
-    """Enhanced entity extraction for multiple domains including science and history."""
+    """
+    Extracts and returns a single prominent entity referenced in a text prompt, normalized to a standardized name.
+    
+    The function detects entities across multiple domains (geography, science, history, astronomy/physics) and recognizes multi-word and special-case entities (e.g., historical figures, world wars). If domain-specific patterns fail, it falls back to extracting capitalized words or the first meaningful word from the prompt.
+    
+    Parameters:
+        prompt (str): The input text to analyze for an entity.
+    
+    Returns:
+        str: A normalized entity name suitable for downstream knowledge lookups or display.
+    """
     import re
+    
+    # Special patterns for multi-word entities (check these first)
+    special_patterns = [
+        r"World War (I{1,2}|[12])",  # World War I, II, 1, 2 (not III as it didn't happen)
+        r"(Napoleon Bonaparte|Julius Caesar|Albert Einstein|William Shakespeare)",
+    ]
+    
+    for pattern in special_patterns:
+        match = re.search(pattern, prompt, re.IGNORECASE)
+        if match:
+            if "world war" in match.group(0).lower():
+                # Reconstruct World War II, etc.
+                roman = match.group(1).upper()
+                return normalize_entity_name(f"World War {roman}")
+            return normalize_entity_name(match.group(1))
     
     # Geography patterns - more specific
     geo_patterns = [
@@ -35,35 +60,41 @@ def extract_entity(prompt):
         r"state ([A-Za-z ]+?)(?:\s+is|\s+was|\s+has|$)"
     ]
     
-    # Science patterns
+    # Science patterns - improved to capture the element/entity name
     science_patterns = [
+        r"([A-Z][a-z]+)\s+(?:is|has)\s+(?:a\s+)?(?:chemical\s+)?element",
+        r"([A-Z][a-z]+)\s+(?:is|has)\s+atomic\s+number",
+        r"([A-Z][a-z]+)\s+is\s+made\s+of",
         r"element ([A-Za-z ]+)",
         r"chemical ([A-Za-z ]+)",
         r"molecule ([A-Za-z ]+)",
         r"atom ([A-Za-z ]+)",
         r"planet ([A-Za-z ]+)",
         r"star ([A-Za-z ]+)",
-        r"species ([A-Za-z ]+)",
-        r"organism ([A-Za-z ]+)",
-        r"disease ([A-Za-z ]+)",
-        r"virus ([A-Za-z ]+)",
-        r"bacteria ([A-Za-z ]+)"
     ]
     
     # History patterns
     history_patterns = [
-        r"war ([A-Za-z ]+)",
-        r"battle ([A-Za-z ]+)",
+        r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+was\s+born",
         r"emperor ([A-Za-z ]+)",
         r"king ([A-Za-z ]+)",
         r"queen ([A-Za-z ]+)",
         r"president ([A-Za-z ]+)",
-        r"dynasty ([A-Za-z ]+)",
-        r"empire ([A-Za-z ]+)",
-        r"revolution ([A-Za-z ]+)",
-        r"treaty ([A-Za-z ]+)",
-        r"century ([A-Za-z ]+)"
     ]
+    
+    # Astronomy/Physics patterns
+    astro_patterns = [
+        r"(?:the\s+)?sun\s+rises",  # Special case for "sun"
+        r"(?:the\s+)?moon\s+(?:is|orbits)",
+    ]
+    
+    for pattern in astro_patterns:
+        match = re.search(pattern, prompt, re.IGNORECASE)
+        if match:
+            if "sun" in match.group(0).lower():
+                return normalize_entity_name("Sun")
+            elif "moon" in match.group(0).lower():
+                return normalize_entity_name("Moon")
     
     # Try all patterns
     all_patterns = geo_patterns + science_patterns + history_patterns
@@ -74,18 +105,23 @@ def extract_entity(prompt):
             entity = match.group(1).strip()
             # Normalize common names
             entity = entity.replace("the ", "").replace("The ", "")
+            # Remove trailing words that are not part of the entity
+            entity = re.sub(r'\s+(is|was|has|ended|became|born).*$', '', entity, flags=re.IGNORECASE)
             return normalize_entity_name(entity)
     
     # Fallback: extract first capitalized word or phrase
     words = prompt.split()
     for i, word in enumerate(words):
+        # Skip common articles and prepositions
+        if word.lower() in ["the", "a", "an", "of", "in", "on", "at"]:
+            continue
         if word.istitle() and len(word) > 2:  # Skip short words
             # Check if next word is also capitalized (for multi-word entities)
             if i + 1 < len(words) and words[i + 1].istitle():
                 return normalize_entity_name(f"{word} {words[i + 1]}")
             return normalize_entity_name(word)
     
-    # Last resort: return first few words, but be more selective
+    # Last resort: return first meaningful word
     words = prompt.split()
     if len(words) >= 2:
         # Try to extract meaningful entity from first two words
@@ -334,11 +370,39 @@ def extract_entities(prompt, response):
 
 def adaptive_correction(model, tokenizer, llm, llm_tokenizer, prompt, device, sim_threshold=0.8, hvi_threshold=0.7):
     # Generate initial response using LLM
+    """
+    Generate an LLM response for a prompt, verify it against knowledge-graph facts, and apply KG-backed corrections when the combined knowledge-verification index is below a threshold.
+    
+    This function:
+    - Produces an initial response using the provided LLM and computes semantic similarity between the prompt and the response.
+    - Extracts a primary entity from the prompt and retrieves or generates relevant knowledge-graph (KG) facts.
+    - Computes a knowledge-verification index (HVI) that combines contextual similarity and KG evidence.
+    - Checks whether the LLM response is semantically supported by KG facts and detects simple contradictions.
+    - If the HVI is below `hvi_threshold` and the KG does not support the response, replaces or augments the response with a relevant KG-backed fact or a concise summary of available facts.
+    - Ensures the returned response is meaningful (falls back to KG facts summary when necessary).
+    
+    Parameters:
+        prompt (str): The input prompt to generate and validate a response for.
+        device (str): Compute device identifier (e.g., "cpu" or "cuda") used for model execution.
+        sim_threshold (float): Similarity threshold used internally for contextual checks (default 0.8).
+        hvi_threshold (float): HVI threshold below which KG-backed correction is applied (default 0.7).
+    
+    Returns:
+        tuple:
+            response (str): Final response text (original, corrected, or KG-based fallback).
+            factual (bool): `True` if no correction was applied (response considered KG-supported), `False` if correction was applied.
+            hvi (float): Computed knowledge-verification index indicating alignment between prompt, response, and KG facts.
+    """
     response = generate_llm_response(llm, llm_tokenizer, prompt, device)
     # Compute context similarity
     similarity = compute_context_similarity(model, tokenizer, prompt, response, device)
-    # Extract entities from prompt and response
-    entities = extract_entities(prompt, response)
+    
+    # Extract primary entity from the prompt
+    entity = extract_entity(prompt)
+    
+    # Fetch knowledge graph facts for the entity
+    kg_facts = fetch_kg_data(entity)
+    
     # Enhanced fallback: if no KG facts, try to generate more
     if not kg_facts or all("not available" in fact.lower() for fact in kg_facts):
         # Try to get more specific facts based on the prompt context
@@ -350,14 +414,67 @@ def adaptive_correction(model, tokenizer, llm, llm_tokenizer, prompt, device, si
     # Compute HVI
     hvi = compute_hvi(similarity, kg_facts, response)
     factual = True
-    # Correction logic: if HVI is low or KG facts not in response, re-generate
-    if hvi < hvi_threshold or not any(fact.lower() in response.lower() for fact in kg_facts):
+    
+    # Check if response is semantically supported by KG facts
+    # Extract key terms from response and KG facts
+    stopwords = {'the', 'is', 'are', 'was', 'were', 'been', 'have', 'has', 'had', 
+                'this', 'that', 'with', 'from', 'for', 'and', 'or', 'but', 'a', 'an'}
+    response_words = set(word.lower().strip('.,;:!?') for word in response.split() 
+                        if len(word) > 2 and word.lower() not in stopwords)
+    
+    # Check if response has strong overlap with any KG fact AND no contradictions
+    kg_supports_response = False
+    has_contradiction = False
+    
+    for fact in kg_facts:
+        if "not available" in fact.lower():
+            continue
+        fact_words = set(word.lower().strip('.,;:!?') for word in fact.split() 
+                        if len(word) > 2 and word.lower() not in stopwords)
+        overlap = len(response_words & fact_words)
+        overlap_ratio = overlap / max(len(response_words), 1)
+        
+        # Check for contradiction: if facts contain entity names not in response
+        # For example: "capital is Paris" vs "capital is Florida"
+        fact_entities = fact_words - response_words
+        response_entities = response_words - fact_words
+        
+        # If we have shared context (capital, country) but different entities, it's a contradiction
+        if overlap >= 2 and len(fact_entities) > 0 and len(response_entities) > 0:
+            # Check if it's a proper noun mismatch (capitalized words)
+            has_contradiction = True
+        
+        # If significant overlap (>60%) and no clear contradiction, consider supported
+        if overlap_ratio > 0.6 and not has_contradiction:
+            kg_supports_response = True
+            break
+    
+    # Correction logic: Apply correction only if HVI is low AND no KG support
+    if hvi < hvi_threshold and not kg_supports_response:
         factual = False
         
-        # Direct correction using KG facts
+        # Smart fact selection based on prompt content
         correct_fact = None
+        prompt_lower = prompt.lower()
+        
+        # Look for facts matching the prompt context
         for fact in kg_facts:
-            if "capital" in fact.lower() and "paris" in fact.lower():
+            if "not available" in fact.lower():
+                continue
+            fact_lower = fact.lower()
+            if "capital" in prompt_lower and "capital" in fact_lower:
+                correct_fact = fact
+                break
+            elif "element" in prompt_lower and "element" in fact_lower:
+                correct_fact = fact
+                break
+            elif "atomic number" in prompt_lower and "atomic number" in fact_lower:
+                correct_fact = fact
+                break
+            elif "war" in prompt_lower and "war" in fact_lower:
+                correct_fact = fact
+                break
+            elif entity.lower() in fact_lower:
                 correct_fact = fact
                 break
         
@@ -366,11 +483,13 @@ def adaptive_correction(model, tokenizer, llm, llm_tokenizer, prompt, device, si
         else:
             # Try to find any relevant fact
             for fact in kg_facts:
-                if entity.lower() in fact.lower():
+                if "not available" not in fact.lower() and entity.lower() in fact.lower():
                     response = fact
                     break
             else:
-                response = f"Based on available facts: {'. '.join(kg_facts[:2])}"
+                valid_facts = [f for f in kg_facts if "not available" not in f.lower()]
+                if valid_facts:
+                    response = f"Based on available facts: {'. '.join(valid_facts[:2])}"
     
     # Post-process: ensure we have a meaningful response
     if not response or response.strip() == prompt.strip():
