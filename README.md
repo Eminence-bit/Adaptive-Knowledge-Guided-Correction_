@@ -304,15 +304,14 @@ POST /evaluate
 - **Knowledge Graph Caching**: Intelligent fact caching
 - **Single-Pass Correction**: Reduced latency by 30%
 
-## 📝 Academic Paper
 
-The complete IEEE paper draft is available at `docs/paper/akgc_paper_draft.tex`. The paper includes:
+## � Further Reading & Innovation
 
-- Abstract and Introduction
-- Related Work and Methodology
-- Experimental Setup and Results
-- Discussion and Conclusion
-- References and Acknowledgments
+For a detailed overview of the AKGC system, its innovations, and a comparison with prior work, see:
+
+- [AKGC_Overview_and_Innovation.md](./AKGC_Overview_and_Innovation.md)
+
+The complete IEEE paper draft is available at `docs/paper/akgc_paper_draft.tex`.
 
 **Target Venue**: IEEE ICASSP 2026
 
