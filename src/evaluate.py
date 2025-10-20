@@ -1,7 +1,7 @@
 import argparse
 import json
 import pandas as pd
-from akgc_algorithm import adaptive_correction
+from akgc_optimized import OptimizedAKGC
 from utils.metrics import compute_accuracy, compute_rouge_l, compute_bertscore, compute_hvi
 import yaml
 
@@ -13,7 +13,7 @@ def load_dataset(dataset_path):
 def evaluate(dataset_path, metrics, output_dir):
     """Evaluate AKGC on dataset and save results."""
     import torch
-    from akgc_algorithm import load_config, load_model, load_llm, adaptive_correction
+    from akgc_algorithm import load_config, load_model, load_llm
     
     dataset = load_dataset(dataset_path)
     results = {"prompt": [], "response": [], "is_factual": [], "hvi": []}
@@ -27,10 +27,16 @@ def evaluate(dataset_path, metrics, output_dir):
     for item in dataset:
         prompt = item["prompt"]
         ground_truth = item.get("ground_truth", "")
-        response, is_factual, hvi = adaptive_correction(
-            model, tokenizer, llm, llm_tokenizer, prompt, device, 
-            config["sim_threshold"], config["hvi_threshold"]
-        )
+        akgc = OptimizedAKGC()
+        try:
+            response, is_factual, hvi = akgc.adaptive_correction_optimized(
+                prompt,
+                sim_threshold=akgc.config.get("sim_threshold", 0.8),
+                hvi_threshold=akgc.config.get("hvi_threshold", 0.7)
+            )
+        except Exception as e:
+            print(f"[ERROR] KG fetch or correction failed for prompt: '{prompt}' | Error: {e}")
+            response, is_factual, hvi = "[KG fetch failed]", False, 0.0
         
         results["prompt"].append(prompt)
         results["response"].append(response)

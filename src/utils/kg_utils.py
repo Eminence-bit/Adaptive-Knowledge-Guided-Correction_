@@ -29,41 +29,54 @@ def fetch_kg_data(query, cache_path="models/cache/kg_cache.json"):
     
     if query in cache:
         return cache[query]
-    
-    # Fetch from Wikipedia API
+
+    # Try to find the best Wikipedia page using the search API
     try:
-        # Use Wikipedia's search API to find relevant pages
-        search_url = "https://en.wikipedia.org/api/rest_v1/page/summary/" + query.replace(" ", "_")
-        response = requests.get(search_url, timeout=10)
-        
+        print(f"[KG] Searching Wikipedia for query: '{query}'")
+        search_api = f"https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={query}&format=json"
+        search_resp = requests.get(search_api, timeout=10)
+        if search_resp.status_code == 200:
+            search_data = search_resp.json()
+            if search_data.get('query', {}).get('search'):
+                best_title = search_data['query']['search'][0]['title']
+                print(f"[KG] Best Wikipedia title found: '{best_title}'")
+            else:
+                best_title = query
+                print(f"[KG] No Wikipedia search results, using original query: '{query}'")
+        else:
+            best_title = query
+            print(f"[KG] Wikipedia search API failed, using original query: '{query}'")
+    except Exception as e:
+        best_title = query
+        print(f"[KG] Exception during Wikipedia search: {e}. Using original query: '{query}'")
+
+    # Fetch summary for the best title
+    try:
+        summary_url = "https://en.wikipedia.org/api/rest_v1/page/summary/" + best_title.replace(" ", "_")
+        print(f"[KG] Fetching Wikipedia summary for: '{best_title}' -> {summary_url}")
+        response = requests.get(summary_url, timeout=10)
+        print(f"[KG] Wikipedia summary status: {response.status_code}")
         if response.status_code == 200:
             data = response.json()
             facts = []
-            
-            # Extract key facts from Wikipedia summary
             if "extract" in data:
-                facts.append(data["extract"][:250] + "...")  # First 250 chars
-            
+                facts.append(data["extract"][:250] + "...")
             if "description" in data:
                 facts.append(f"Description: {data['description']}")
-            
-            # Add some hardcoded facts for common entities
             facts.extend(get_hardcoded_facts(query))
-            
             cache[query] = facts
             with open(cache_path, "w") as f:
                 json.dump(cache, f, indent=2)
             return facts
         else:
-            # Fallback to hardcoded facts
+            print(f"[KG] Wikipedia summary fetch failed for '{best_title}' (status {response.status_code})")
             facts = get_hardcoded_facts(query)
             cache[query] = facts
             with open(cache_path, "w") as f:
                 json.dump(cache, f, indent=2)
             return facts
     except Exception as e:
-        print(f"Error fetching KG data for {query}: {e}")
-        # Fallback to hardcoded facts
+        print(f"[KG] Error fetching KG data for {query}: {e}")
         facts = get_hardcoded_facts(query)
         cache[query] = facts
         with open(cache_path, "w") as f:

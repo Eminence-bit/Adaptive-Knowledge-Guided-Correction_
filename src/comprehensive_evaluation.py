@@ -10,7 +10,7 @@ import os
 import time
 import pandas as pd
 from datetime import datetime
-from akgc_algorithm import load_config, load_model, load_llm, adaptive_correction
+from akgc_optimized import OptimizedAKGC
 from utils.metrics import compute_accuracy, compute_rouge_l, compute_bertscore, compute_hvi
 import torch
 
@@ -221,4 +221,19 @@ def main():
         print(f"\nResults saved to: {args.output_dir}")
 
 if __name__ == "__main__":
-    main()
+    def main():
+        akgc = OptimizedAKGC()
+        # ...existing code...
+        for sample in dataset:
+            prompt = sample["prompt"]
+            ground_truth = sample.get("ground_truth", "")
+            try:
+                response, is_factual, hvi = akgc.adaptive_correction_optimized(
+                    prompt,
+                    sim_threshold=akgc.config.get("sim_threshold", 0.8),
+                    hvi_threshold=akgc.config.get("hvi_threshold", 0.7)
+                )
+            except Exception as e:
+                print(f"[ERROR] KG fetch or correction failed for prompt: '{prompt}' | Error: {e}")
+                response, is_factual, hvi = "[KG fetch failed]", False, 0.0
+            # ...existing code...

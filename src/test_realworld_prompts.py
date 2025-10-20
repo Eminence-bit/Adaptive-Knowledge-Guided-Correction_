@@ -6,7 +6,7 @@ Tests against diverse, realistic prompts from various domains
 
 import time
 import json
-from akgc_algorithm import load_config, load_model, load_llm, adaptive_correction
+from akgc_optimized import OptimizedAKGC
 from utils.metrics import compute_accuracy, compute_rouge_l, compute_bertscore
 
 def load_realworld_test_cases():
@@ -156,26 +156,14 @@ def test_akgc_on_realworld_prompts():
     """Test AKGC algorithm on real-world prompts."""
     print("🌍 Testing AKGC on Real-World Prompts")
     print("=" * 60)
-    
-    # Load models
-    print("Loading models...")
-    config = load_config()
-    device = "cpu"  # Force CPU for compatibility
-    model, tokenizer = load_model(config["model"], device)
-    llm, llm_tokenizer = load_llm(device)
+    akgc = OptimizedAKGC()
     print("✅ Models loaded successfully!")
-    
-    # Load test cases
     test_cases = load_realworld_test_cases()
-    
-    # Results storage
     all_results = []
     domain_results = {}
-    
     total_tests = sum(len(cases) for cases in test_cases.values())
     print(f"\n📊 Running {total_tests} real-world test cases...")
     print("=" * 60)
-    
     for domain, cases in test_cases.items():
         print(f"\n🔍 Testing {domain} domain ({len(cases)} cases)...")
         domain_results[domain] = {
@@ -187,33 +175,22 @@ def test_akgc_on_realworld_prompts():
             "avg_bert": 0.0,
             "cases": []
         }
-        
         for i, case in enumerate(cases, 1):
             print(f"\n  Test {i}/{len(cases)}: {case['prompt'][:50]}...")
-            
             start_time = time.time()
-            
             try:
-                # Run AKGC
-                response, factual, hvi = adaptive_correction(
-                    model, tokenizer, llm, llm_tokenizer, 
-                    case['prompt'], device,
-                    sim_threshold=0.8, hvi_threshold=0.7
+                response, factual, hvi = akgc.adaptive_correction_optimized(
+                    case['prompt'],
+                    sim_threshold=akgc.config.get("sim_threshold", 0.8),
+                    hvi_threshold=akgc.config.get("hvi_threshold", 0.7)
                 )
-                
                 processing_time = time.time() - start_time
-                
-                # Compute metrics
                 accuracy = compute_accuracy(response, case['ground_truth'])
                 rouge_l = compute_rouge_l(response, case['ground_truth'])
                 bertscore = compute_bertscore(response, case['ground_truth'])
-                
-                # Determine if correction was applied
                 was_corrected = not factual
                 correction_expected = case['expected_correction']
                 correction_correct = (was_corrected == correction_expected)
-                
-                # Store results
                 result = {
                     "prompt": case['prompt'],
                     "response": response,
@@ -229,20 +206,14 @@ def test_akgc_on_realworld_prompts():
                     "bertscore": bertscore,
                     "processing_time": processing_time
                 }
-                
                 all_results.append(result)
                 domain_results[domain]["cases"].append(result)
-                
-                # Update domain statistics
                 if was_corrected:
                     domain_results[domain]["corrected"] += 1
-                
-                # Print result
                 print(f"    Response: {response[:80]}...")
                 print(f"    Factual: {factual} | HVI: {hvi:.3f} | Corrected: {was_corrected}")
                 print(f"    Accuracy: {accuracy:.3f} | ROUGE-L: {rouge_l:.3f} | BERTScore: {bertscore:.3f}")
                 print(f"    Correction Expected: {correction_expected} | Correction Correct: {correction_correct}")
-                
             except Exception as e:
                 print(f"    ❌ Error: {e}")
                 result = {
@@ -260,66 +231,54 @@ def test_akgc_on_realworld_prompts():
                 }
                 all_results.append(result)
                 domain_results[domain]["cases"].append(result)
-        
-        # Calculate domain statistics
-        if domain_results[domain]["cases"]:
-            domain_results[domain]["accuracy"] = sum(r["accuracy"] for r in domain_results[domain]["cases"]) / len(domain_results[domain]["cases"])
-            domain_results[domain]["avg_hvi"] = sum(r["hvi"] for r in domain_results[domain]["cases"]) / len(domain_results[domain]["cases"])
-            domain_results[domain]["avg_rouge"] = sum(r["rouge_l"] for r in domain_results[domain]["cases"]) / len(domain_results[domain]["cases"])
-            domain_results[domain]["avg_bert"] = sum(r["bertscore"] for r in domain_results[domain]["cases"]) / len(domain_results[domain]["cases"])
-    
-    # Calculate overall statistics
-    total_cases = len(all_results)
-    successful_cases = len([r for r in all_results if "error" not in r])
-    overall_accuracy = sum(r["accuracy"] for r in all_results if "error" not in r) / successful_cases if successful_cases > 0 else 0
-    overall_hvi = sum(r["hvi"] for r in all_results if "error" not in r) / successful_cases if successful_cases > 0 else 0
-    overall_rouge = sum(r["rouge_l"] for r in all_results if "error" not in r) / successful_cases if successful_cases > 0 else 0
-    overall_bert = sum(r["bertscore"] for r in all_results if "error" not in r) / successful_cases if successful_cases > 0 else 0
-    
-    # Print comprehensive results
-    print("\n" + "=" * 80)
-    print("📈 COMPREHENSIVE REAL-WORLD TEST RESULTS")
-    print("=" * 80)
-    
-    print(f"\n🎯 Overall Performance:")
-    print(f"   Total Test Cases: {total_cases}")
-    print(f"   Successful Cases: {successful_cases}")
-    print(f"   Success Rate: {successful_cases/total_cases*100:.1f}%")
-    print(f"   Overall Accuracy: {overall_accuracy:.3f}")
-    print(f"   Overall ROUGE-L: {overall_rouge:.3f}")
-    print(f"   Overall BERTScore: {overall_bert:.3f}")
-    print(f"   Overall HVI: {overall_hvi:.3f}")
-    
-    print(f"\n📊 Domain-Specific Results:")
-    for domain, stats in domain_results.items():
-        print(f"\n   {domain}:")
-        print(f"     Cases: {stats['total']}")
-        print(f"     Corrected: {stats['corrected']} ({stats['corrected']/stats['total']*100:.1f}%)")
-        print(f"     Accuracy: {stats['accuracy']:.3f}")
-        print(f"     ROUGE-L: {stats['avg_rouge']:.3f}")
-        print(f"     BERTScore: {stats['avg_bert']:.3f}")
-        print(f"     HVI: {stats['avg_hvi']:.3f}")
-    
-    # Save detailed results
-    results_file = "results/realworld_test_results.json"
-    with open(results_file, "w") as f:
-        json.dump({
-            "overall_stats": {
-                "total_cases": total_cases,
-                "successful_cases": successful_cases,
-                "success_rate": successful_cases/total_cases,
-                "overall_accuracy": overall_accuracy,
-                "overall_rouge_l": overall_rouge,
-                "overall_bertscore": overall_bert,
-                "overall_hvi": overall_hvi
-            },
-            "domain_results": domain_results,
-            "detailed_results": all_results
-        }, f, indent=2)
-    
-    print(f"\n💾 Detailed results saved to: {results_file}")
-    
-    return all_results, domain_results
+            if domain_results[domain]["cases"]:
+                domain_results[domain]["accuracy"] = sum(r["accuracy"] for r in domain_results[domain]["cases"]) / len(domain_results[domain]["cases"])
+                domain_results[domain]["avg_hvi"] = sum(r["hvi"] for r in domain_results[domain]["cases"]) / len(domain_results[domain]["cases"])
+                domain_results[domain]["avg_rouge"] = sum(r["rouge_l"] for r in domain_results[domain]["cases"]) / len(domain_results[domain]["cases"])
+                domain_results[domain]["avg_bert"] = sum(r["bertscore"] for r in domain_results[domain]["cases"]) / len(domain_results[domain]["cases"])
+        total_cases = len(all_results)
+        successful_cases = len([r for r in all_results if "error" not in r])
+        overall_accuracy = sum(r["accuracy"] for r in all_results if "error" not in r) / successful_cases if successful_cases > 0 else 0
+        overall_hvi = sum(r["hvi"] for r in all_results if "error" not in r) / successful_cases if successful_cases > 0 else 0
+        overall_rouge = sum(r["rouge_l"] for r in all_results if "error" not in r) / successful_cases if successful_cases > 0 else 0
+        overall_bert = sum(r["bertscore"] for r in all_results if "error" not in r) / successful_cases if successful_cases > 0 else 0
+        print("\n" + "=" * 80)
+        print("📈 COMPREHENSIVE REAL-WORLD TEST RESULTS")
+        print("=" * 80)
+        print(f"\n🎯 Overall Performance:")
+        print(f"   Total Test Cases: {total_cases}")
+        print(f"   Successful Cases: {successful_cases}")
+        print(f"   Success Rate: {successful_cases/total_cases*100:.1f}%")
+        print(f"   Overall Accuracy: {overall_accuracy:.3f}")
+        print(f"   Overall ROUGE-L: {overall_rouge:.3f}")
+        print(f"   Overall BERTScore: {overall_bert:.3f}")
+        print(f"   Overall HVI: {overall_hvi:.3f}")
+        print(f"\n📊 Domain-Specific Results:")
+        for domain, stats in domain_results.items():
+            print(f"\n   {domain}:")
+            print(f"     Cases: {stats['total']}")
+            print(f"     Corrected: {stats['corrected']} ({stats['corrected']/stats['total']*100:.1f}%)")
+            print(f"     Accuracy: {stats['accuracy']:.3f}")
+            print(f"     ROUGE-L: {stats['avg_rouge']:.3f}")
+            print(f"     BERTScore: {stats['avg_bert']:.3f}")
+            print(f"     HVI: {stats['avg_hvi']:.3f}")
+        results_file = "results/realworld_test_results.json"
+        with open(results_file, "w") as f:
+            json.dump({
+                "overall_stats": {
+                    "total_cases": total_cases,
+                    "successful_cases": successful_cases,
+                    "success_rate": successful_cases/total_cases,
+                    "overall_accuracy": overall_accuracy,
+                    "overall_rouge_l": overall_rouge,
+                    "overall_bertscore": overall_bert,
+                    "overall_hvi": overall_hvi
+                },
+                "domain_results": domain_results,
+                "detailed_results": all_results
+            }, f, indent=2)
+        print(f"\n💾 Detailed results saved to: {results_file}")
+        return all_results, domain_results
 
 def main():
     """Main function to run real-world testing."""
