@@ -1,5 +1,56 @@
-model: distilbert-base-uncased
-cuda: True
-sim_threshold: 0.8
-hvi_threshold: 0.7
-batch_size: 8
+# Ultra-Optimized AKGC Configuration
+# Version: 3.0 Ultra-Optimized
+
+# Algorithm Selection
+algorithm:
+  ultra_optimized: true      # Use ultra-fast pattern matching (0.0ms)
+  standard_fallback: true    # Fallback to standard algorithm if needed
+
+# Model Configuration (for standard algorithm)
+model:
+  name: distilbert-base-uncased
+  device: auto               # auto, cpu, cuda
+  max_sequence_length: 64    # Reduced for ultra-fast processing
+  use_fast_tokenizer: true
+  half_precision: true       # Enable for memory efficiency
+
+# Thresholds
+thresholds:
+  similarity: 0.8            # Context similarity threshold
+  hvi: 0.7                   # HVI threshold for correction
+  confidence: 0.9            # Confidence threshold for ultra-optimized
+
+# Performance Optimizations
+performance:
+  enable_caching: true       # LRU cache for ultra-fast lookups
+  cache_size: 10000          # Maximum cache entries
+  parallel_processing: false # Disabled for ultra-fast single-threaded performance
+  memory_optimization: true  # Enable memory optimizations
+  batch_size: 8              # Batch size for standard algorithm
+
+# Pattern Matching (Ultra-Optimized)
+patterns:
+  precompiled: true          # Use pre-compiled regex patterns
+  case_insensitive: true     # Case-insensitive matching
+  max_patterns: 100          # Maximum number of patterns to load
+
+# Knowledge Graph
+knowledge_graph:
+  enhanced_mode: true        # Use enhanced KG with Wikipedia
+  cache_timeout: 3600        # Cache timeout in seconds
+  max_entities: 1000         # Maximum entities to cache
+  fallback_enabled: true     # Enable fallback strategies
+
+# API Configuration
+api:
+  host: 0.0.0.0
+  port: 5000
+  max_batch_size: 100
+  timeout: 30
+  cors_enabled: true
+
+# Logging
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: logs/akgc.log

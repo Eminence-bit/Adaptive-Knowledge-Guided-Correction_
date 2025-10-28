@@ -11,7 +11,7 @@ import yaml
 import time
 import logging
 from typing import Dict, List
-from akgc_optimized import OptimizedAKGC
+from akgc_simple_fast import SimpleFastAKGC
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -24,12 +24,12 @@ CORS(app)
 akgc_instance = None
 
 def initialize_akgc():
-    """Initialize the AKGC model."""
+    """Initialize the production-ready AKGC model."""
     global akgc_instance
     try:
-        logger.info("Initializing AKGC model...")
-        akgc_instance = OptimizedAKGC()
-        logger.info("AKGC model initialized successfully!")
+        logger.info("Initializing Production AKGC model...")
+        akgc_instance = SimpleFastAKGC()
+        logger.info("Production AKGC model initialized successfully!")
         return True
     except Exception as e:
         logger.error(f"Failed to initialize AKGC: {e}")
@@ -60,7 +60,7 @@ def detect_hallucination():
         threshold = data.get('threshold', 0.7)
         
         start_time = time.time()
-        response, factual, hvi = akgc_instance.adaptive_correction_optimized(
+        response, factual, hvi = akgc_instance.adaptive_correction_simple_fast(
             text, hvi_threshold=threshold
         )
         processing_time = time.time() - start_time
@@ -71,7 +71,8 @@ def detect_hallucination():
             "is_factual": factual,
             "hvi": float(hvi),
             "needs_correction": hvi < threshold,
-            "processing_time": processing_time
+            "processing_time": processing_time,
+            "performance_target_met": processing_time < 0.3  # 300ms target
         })
         
     except Exception as e:
@@ -97,7 +98,16 @@ def batch_detect_hallucination():
             return jsonify({"error": "Batch size too large (max 100)"}), 400
         
         start_time = time.time()
-        results = akgc_instance.batch_process(texts)
+        # Process each text individually for batch processing
+        results = []
+        for text in texts:
+            response, factual, hvi = akgc_instance.adaptive_correction_simple_fast(text, hvi_threshold=threshold)
+            results.append({
+                "prompt": text,
+                "response": response,
+                "factual": factual,
+                "hvi": hvi
+            })
         processing_time = time.time() - start_time
         
         # Format results
@@ -139,7 +149,7 @@ def evaluate_text():
         threshold = data.get('threshold', 0.7)
         
         start_time = time.time()
-        response, factual, hvi = akgc_instance.adaptive_correction_optimized(
+        response, factual, hvi = akgc_instance.adaptive_correction_simple_fast(
             text, hvi_threshold=threshold
         )
         processing_time = time.time() - start_time

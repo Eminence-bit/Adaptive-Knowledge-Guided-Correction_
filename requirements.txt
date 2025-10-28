@@ -1,8 +1,23 @@
+# Core ML Dependencies
 torch>=2.0.0
 transformers>=4.35.0
-requests>=2.31.0
-scipy>=1.11.0
 numpy>=1.24.0
+scipy>=1.11.0
+
+# Web API Dependencies
+flask>=3.0.0
+flask-cors>=4.0.0
+requests>=2.31.0
+
+# Evaluation Metrics
 rouge-score>=0.1.2
 bert-score>=0.3.13
+
+# Configuration
 pyyaml>=6.0
+
+# Production Server (optional)
+gunicorn>=21.0.0
+
+# Development/Testing (optional)
+pytest>=7.0.0
