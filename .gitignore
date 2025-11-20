@@ -155,7 +155,7 @@ huggingface/
 
 # Data files - exclude large files, keep structure
 # Large datasets (download separately)
-data/halu_eval/*.json
+data/halueval/*.json
 data/hotpotqa/*.json
 data/custom/*.json
 
@@ -164,11 +164,21 @@ data/custom/*.json
 !data/README.md
 !data/samples/
 
-# Results and outputs
-results/
+# Results and outputs - exclude large test results
+results/external/*.json
+results/external/*.md
+results/comprehensive_large_scale_test.json
 outputs/
 logs/
 *.log
+
+# Keep benchmark results and visualizations
+!results/benchmark/benchmark_results.json
+!results/benchmark/akgc_vs_kgcn_comparison.png
+!results/benchmark/akgc_vs_kgcn_comparison.pdf
+!results/benchmark/benchmark_table.tex
+!results/benchmark/domain_performance.png
+!results/benchmark/domain_performance.pdf
 
 # Temporary files
 tmp/
@@ -249,3 +259,4 @@ Desktop.ini
 !deploy.sh
 !Dockerfile
 !docker-compose.yml
+results/benchmark/halueval_sample.json

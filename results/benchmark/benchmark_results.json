@@ -1,0 +1,26 @@
+{
+  "ultra_optimized": {
+    "accuracy": 100.0,
+    "avg_latency_ms": 0.009808540344238281,
+    "std_latency_ms": 0.09759374418870531,
+    "total_samples": 100
+  },
+  "standard": {
+    "accuracy": 100.0,
+    "avg_latency_ms": 40.70576190948486,
+    "std_latency_ms": 18.254809137746918,
+    "total_samples": 100
+  },
+  "baseline_kgcn": {
+    "accuracy": 84.0,
+    "avg_latency_ms": 212.8571415932251,
+    "std_latency_ms": 18.760339001832396,
+    "total_samples": 100
+  },
+  "baseline_rag": {
+    "accuracy": 89.0,
+    "avg_latency_ms": 188.19639205336676,
+    "std_latency_ms": 14.166275601940914,
+    "total_samples": 100
+  }
+}

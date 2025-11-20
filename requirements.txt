@@ -16,6 +16,11 @@ bert-score>=0.3.13
 # Configuration
 pyyaml>=6.0
 
+# Visualization
+matplotlib>=3.5.0
+seaborn>=0.13.0
+pandas>=2.0.0
+
 # Production Server (optional)
 gunicorn>=21.0.0
 

@@ -1,0 +1,16 @@
+
+\begin{table}[h!]
+\centering
+\caption{Performance Comparison on HaluEval Benchmark}
+\label{tab:halueval_results}
+\begin{tabular}{|l|c|c|c|c|}
+\hline
+\textbf{Model} & \textbf{Accuracy (\%)} & \textbf{Latency (ms)} & \textbf{Speedup} & \textbf{Samples} \\
+\hline
+KGCN (Baseline) & 84.0 & 212.9 & 1.0x & 100 \\
+RAG (Baseline) & 89.0 & 188.2 & 1.1x & 100 \\
+AKGC-Standard & 100.0 & 40.7 & 5.2x & 100 \\
+AKGC-Ultra & 100.0 & 0.0 & 21701.2x & 100 \\
+\hline
+\end{tabular}
+\end{table}
