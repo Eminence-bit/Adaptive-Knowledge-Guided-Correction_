@@ -190,12 +190,61 @@ print(f"HVI: {hvi:.3f}")           # 0.880 (96ms average)
 
 ## 🏗️ Architecture
 
+> **📊 Visual Diagrams**: See [docs/diagrams/](docs/diagrams/) for comprehensive PlantUML and Mermaid diagrams including:
+> - System Architecture
+> - Use Case Diagrams
+> - Sequence Diagrams
+> - Activity Diagrams
+> - Class Diagrams
+> - System Design & Deployment
+
 ### Core Components
 
 1. **Contextual Analyzer**: Uses DistilBERT for semantic similarity computation
 2. **Entity Extractor**: Identifies relevant entities for knowledge graph queries
 3. **Knowledge Graph Manager**: Fetches and caches facts from external sources
 4. **Correction Engine**: Applies adaptive correction based on HVI scores
+
+### System Architecture Overview
+
+```mermaid
+graph TB
+    subgraph "AKGC System"
+        API[API Server]
+        
+        subgraph "Processing Modes"
+            Standard[Standard Mode<br/>100% Accuracy<br/>40ms]
+            Ultra[Ultra Mode<br/>100% Accuracy<br/>0.01ms]
+        end
+        
+        subgraph "Core Components"
+            Extractor[Entity Extractor]
+            Analyzer[Semantic Analyzer]
+            HVI[HVI Calculator]
+            Corrector[Correction Engine]
+        end
+        
+        subgraph "Knowledge Graph"
+            KGManager[KG Manager]
+            Cache[Cache System<br/>29+ Entities]
+        end
+    end
+    
+    API --> Standard
+    API --> Ultra
+    Standard --> Extractor
+    Standard --> Analyzer
+    Standard --> HVI
+    Standard --> Corrector
+    Ultra --> Cache
+    Ultra --> Corrector
+    Extractor --> KGManager
+    HVI --> KGManager
+    
+    style Standard fill:#3498db,color:#fff
+    style Ultra fill:#2ecc71,color:#fff
+    style API fill:#e74c3c,color:#fff
+```
 
 ### Hallucination Vulnerability Index (HVI)
 
