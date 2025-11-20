@@ -18,12 +18,11 @@ def load_benchmark_results():
     print(f"✅ Loaded benchmark results from: {results_path}")
     return data
 
-def create_comprehensive_comparison(results):
-    """Create comprehensive comparison visualizations"""
+def create_individual_charts(results):
+    """Create individual comparison charts"""
     
     # Set style
     plt.style.use('seaborn-v0_8-whitegrid')
-    fig = plt.figure(figsize=(18, 10))
     
     # Prepare data
     systems = ['KGCN\n(Baseline)', 'RAG\n(Baseline)', 'AKGC\n(Standard)', 'AKGC\n(Ultra)']
@@ -35,97 +34,119 @@ def create_comprehensive_comparison(results):
     
     colors = ['#e74c3c', '#f39c12', '#3498db', '#2ecc71']
     
-    # 1. Accuracy Comparison
-    ax1 = plt.subplot(2, 3, 1)
+    # Chart 1: Accuracy Comparison
+    fig1 = plt.figure(figsize=(10, 6))
+    ax1 = fig1.add_subplot(111)
     bars = ax1.bar(systems, accuracies, color=colors, edgecolor='black', linewidth=1.5)
-    ax1.set_ylabel('Accuracy (%)', fontsize=12, fontweight='bold')
-    ax1.set_title('Accuracy Comparison', fontsize=14, fontweight='bold', pad=15)
+    ax1.set_ylabel('Accuracy (%)', fontsize=13, fontweight='bold')
+    ax1.set_title('Accuracy Comparison: AKGC vs Baseline Systems', fontsize=15, fontweight='bold', pad=20)
     ax1.set_ylim(0, 105)
-    ax1.axhline(y=100, color='green', linestyle='--', alpha=0.3, linewidth=2)
+    ax1.axhline(y=100, color='green', linestyle='--', alpha=0.3, linewidth=2, label='Perfect Score')
+    ax1.legend(fontsize=11)
+    ax1.grid(True, alpha=0.3, axis='y')
     
     # Add value labels
     for bar in bars:
         height = bar.get_height()
         ax1.text(bar.get_x() + bar.get_width()/2., height + 1,
                 f'{height:.1f}%',
-                ha='center', va='bottom', fontsize=11, fontweight='bold')
+                ha='center', va='bottom', fontsize=12, fontweight='bold')
     
-    # 2. Latency Comparison
-    ax2 = plt.subplot(2, 3, 2)
+    plt.tight_layout()
+    fig1.savefig('results/benchmark/chart1_accuracy_comparison.png', dpi=300, bbox_inches='tight')
+    fig1.savefig('results/benchmark/chart1_accuracy_comparison.pdf', dpi=300, bbox_inches='tight', format='pdf')
+    print("✅ Chart 1 saved: Accuracy Comparison")
+    plt.close(fig1)
+    
+    # Chart 2: Latency Comparison
+    fig2 = plt.figure(figsize=(10, 6))
+    ax2 = fig2.add_subplot(111)
     bars = ax2.bar(systems, latencies, color=colors, edgecolor='black', linewidth=1.5)
-    ax2.set_ylabel('Latency (ms)', fontsize=12, fontweight='bold')
-    ax2.set_title('Average Latency Comparison', fontsize=14, fontweight='bold', pad=15)
+    ax2.set_ylabel('Latency (ms, log scale)', fontsize=13, fontweight='bold')
+    ax2.set_title('Latency Comparison: AKGC vs Baseline Systems', fontsize=15, fontweight='bold', pad=20)
     ax2.set_yscale('log')
+    ax2.grid(True, alpha=0.3, which='both')
     
     # Add value labels
     for bar in bars:
         height = bar.get_height()
-        ax2.text(bar.get_x() + bar.get_width()/2., height * 1.3,
+        ax2.text(bar.get_x() + bar.get_width()/2., height * 1.5,
                 f'{height:.2f}ms',
-                ha='center', va='bottom', fontsize=10, fontweight='bold')
+                ha='center', va='bottom', fontsize=11, fontweight='bold')
     
-    # 3. Speedup Factor
-    ax3 = plt.subplot(2, 3, 3)
+    plt.tight_layout()
+    fig2.savefig('results/benchmark/chart2_latency_comparison.png', dpi=300, bbox_inches='tight')
+    fig2.savefig('results/benchmark/chart2_latency_comparison.pdf', dpi=300, bbox_inches='tight', format='pdf')
+    print("✅ Chart 2 saved: Latency Comparison")
+    plt.close(fig2)
+    
+    # Chart 3: Speedup Factor
+    fig3 = plt.figure(figsize=(10, 6))
+    ax3 = fig3.add_subplot(111)
     baseline_latency = results['baseline_kgcn']['avg_latency_ms']
     speedups = [baseline_latency / lat for lat in latencies]
     
     bars = ax3.bar(systems, speedups, color=colors, edgecolor='black', linewidth=1.5)
-    ax3.set_ylabel('Speedup Factor (×)', fontsize=12, fontweight='bold')
-    ax3.set_title('Speedup vs KGCN Baseline', fontsize=14, fontweight='bold', pad=15)
-    ax3.axhline(y=1, color='red', linestyle='--', alpha=0.5, linewidth=2, label='Baseline')
-    ax3.legend()
+    ax3.set_ylabel('Speedup Factor (×)', fontsize=13, fontweight='bold')
+    ax3.set_title('Speedup Factor vs KGCN Baseline', fontsize=15, fontweight='bold', pad=20)
+    ax3.axhline(y=1, color='red', linestyle='--', alpha=0.5, linewidth=2, label='Baseline (1×)')
+    ax3.legend(fontsize=11)
+    ax3.grid(True, alpha=0.3, axis='y')
     
     # Add value labels
     for bar in bars:
         height = bar.get_height()
-        ax3.text(bar.get_x() + bar.get_width()/2., height + 0.5,
-                f'{height:.1f}×',
+        ax3.text(bar.get_x() + bar.get_width()/2., height + 500,
+                f'{height:.0f}×',
                 ha='center', va='bottom', fontsize=11, fontweight='bold')
     
-    # 4. Accuracy vs Latency Scatter
-    ax4 = plt.subplot(2, 3, 4)
-    scatter = ax4.scatter(latencies, accuracies, s=500, c=colors, 
-                         edgecolors='black', linewidth=2, alpha=0.7)
+    plt.tight_layout()
+    fig3.savefig('results/benchmark/chart3_speedup_factor.png', dpi=300, bbox_inches='tight')
+    fig3.savefig('results/benchmark/chart3_speedup_factor.pdf', dpi=300, bbox_inches='tight', format='pdf')
+    print("✅ Chart 3 saved: Speedup Factor")
+    plt.close(fig3)
+    
+    # Chart 4: Accuracy vs Latency Trade-off
+    fig4 = plt.figure(figsize=(10, 7))
+    ax4 = fig4.add_subplot(111)
+    scatter = ax4.scatter(latencies, accuracies, s=600, c=colors, 
+                         edgecolors='black', linewidth=2.5, alpha=0.8, zorder=3)
     
     # Add labels for each point
     for i, system in enumerate(systems):
         ax4.annotate(system.replace('\n', ' '), 
                     (latencies[i], accuracies[i]),
-                    xytext=(10, 10), textcoords='offset points',
-                    fontsize=10, fontweight='bold',
-                    bbox=dict(boxstyle='round,pad=0.5', facecolor=colors[i], alpha=0.3))
+                    xytext=(15, 15), textcoords='offset points',
+                    fontsize=11, fontweight='bold',
+                    bbox=dict(boxstyle='round,pad=0.6', facecolor=colors[i], alpha=0.4, edgecolor='black', linewidth=1.5),
+                    arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0', lw=1.5))
     
-    ax4.set_xlabel('Latency (ms)', fontsize=12, fontweight='bold')
-    ax4.set_ylabel('Accuracy (%)', fontsize=12, fontweight='bold')
-    ax4.set_title('Accuracy vs Latency Trade-off', fontsize=14, fontweight='bold', pad=15)
+    ax4.set_xlabel('Latency (ms, log scale)', fontsize=13, fontweight='bold')
+    ax4.set_ylabel('Accuracy (%)', fontsize=13, fontweight='bold')
+    ax4.set_title('Accuracy vs Latency Trade-off Analysis', fontsize=15, fontweight='bold', pad=20)
     ax4.set_xscale('log')
-    ax4.grid(True, alpha=0.3)
+    ax4.grid(True, alpha=0.3, which='both')
+    ax4.set_ylim(80, 105)
     
-    # 5. Latency with Error Bars
-    ax5 = plt.subplot(2, 3, 5)
-    x_pos = np.arange(len(systems))
-    bars = ax5.bar(x_pos, latencies, yerr=std_latencies, 
-                   color=colors, edgecolor='black', linewidth=1.5,
-                   capsize=8, error_kw={'linewidth': 2, 'ecolor': 'black'})
-    ax5.set_xticks(x_pos)
-    ax5.set_xticklabels(systems)
-    ax5.set_ylabel('Latency (ms)', fontsize=12, fontweight='bold')
-    ax5.set_title('Latency with Standard Deviation', fontsize=14, fontweight='bold', pad=15)
-    ax5.set_yscale('log')
+    plt.tight_layout()
+    fig4.savefig('results/benchmark/chart4_accuracy_vs_latency.png', dpi=300, bbox_inches='tight')
+    fig4.savefig('results/benchmark/chart4_accuracy_vs_latency.pdf', dpi=300, bbox_inches='tight', format='pdf')
+    print("✅ Chart 4 saved: Accuracy vs Latency Trade-off")
+    plt.close(fig4)
     
-    # 6. Performance Improvement Summary
-    ax6 = plt.subplot(2, 3, 6)
-    
+    # Chart 5: Performance Improvement Summary
+    fig5 = plt.figure(figsize=(10, 6))
+    ax5 = fig5.add_subplot(111)
     # Calculate improvements over KGCN
     kgcn_acc = results['baseline_kgcn']['accuracy']
     kgcn_lat = results['baseline_kgcn']['avg_latency_ms']
     
     improvements = {
-        'AKGC\nStandard': {
+        'AKGC Standard': {
             'accuracy': results['standard']['accuracy'] - kgcn_acc,
             'latency': ((kgcn_lat - results['standard']['avg_latency_ms']) / kgcn_lat) * 100
         },
-        'AKGC\nUltra': {
+        'AKGC Ultra': {
             'accuracy': results['ultra_optimized']['accuracy'] - kgcn_acc,
             'latency': ((kgcn_lat - results['ultra_optimized']['avg_latency_ms']) / kgcn_lat) * 100
         }
@@ -137,44 +158,36 @@ def create_comprehensive_comparison(results):
     acc_improvements = [v['accuracy'] for v in improvements.values()]
     lat_improvements = [v['latency'] for v in improvements.values()]
     
-    bars1 = ax6.bar(x - width/2, acc_improvements, width, 
+    bars1 = ax5.bar(x - width/2, acc_improvements, width, 
                     label='Accuracy Gain (%)', color='#3498db', 
                     edgecolor='black', linewidth=1.5)
-    bars2 = ax6.bar(x + width/2, lat_improvements, width, 
+    bars2 = ax5.bar(x + width/2, lat_improvements, width, 
                     label='Latency Reduction (%)', color='#2ecc71',
                     edgecolor='black', linewidth=1.5)
     
-    ax6.set_ylabel('Improvement (%)', fontsize=12, fontweight='bold')
-    ax6.set_title('Improvement over KGCN Baseline', fontsize=14, fontweight='bold', pad=15)
-    ax6.set_xticks(x)
-    ax6.set_xticklabels(improvements.keys())
-    ax6.legend(fontsize=10)
-    ax6.axhline(y=0, color='black', linestyle='-', linewidth=1)
-    ax6.grid(True, alpha=0.3, axis='y')
+    ax5.set_ylabel('Improvement (%)', fontsize=13, fontweight='bold')
+    ax5.set_title('Performance Improvement over KGCN Baseline', fontsize=15, fontweight='bold', pad=20)
+    ax5.set_xticks(x)
+    ax5.set_xticklabels(improvements.keys())
+    ax5.legend(fontsize=11, loc='upper left')
+    ax5.axhline(y=0, color='black', linestyle='-', linewidth=1.5)
+    ax5.grid(True, alpha=0.3, axis='y')
     
     # Add value labels
     for bars in [bars1, bars2]:
         for bar in bars:
             height = bar.get_height()
-            ax6.text(bar.get_x() + bar.get_width()/2., height + 2,
+            ax5.text(bar.get_x() + bar.get_width()/2., height + 3,
                     f'{height:.1f}%',
-                    ha='center', va='bottom', fontsize=10, fontweight='bold')
+                    ha='center', va='bottom', fontsize=11, fontweight='bold')
     
-    plt.suptitle('AKGC vs KGCN Performance Comparison', 
-                fontsize=18, fontweight='bold', y=0.98)
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.tight_layout()
+    fig5.savefig('results/benchmark/chart5_improvement_summary.png', dpi=300, bbox_inches='tight')
+    fig5.savefig('results/benchmark/chart5_improvement_summary.pdf', dpi=300, bbox_inches='tight', format='pdf')
+    print("✅ Chart 5 saved: Performance Improvement Summary")
+    plt.close(fig5)
     
-    # Save figure
-    output_path = Path("results/benchmark/akgc_vs_kgcn_comparison.png")
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    print(f"\n✅ Visualization saved to: {output_path}")
-    
-    # Also save as PDF
-    output_pdf = Path("results/benchmark/akgc_vs_kgcn_comparison.pdf")
-    plt.savefig(output_pdf, dpi=300, bbox_inches='tight', format='pdf')
-    print(f"✅ PDF version saved to: {output_pdf}")
-    
-    plt.show()
+    print("\n✅ All individual charts created successfully!")
 
 def create_summary_table(results):
     """Create a detailed comparison table"""
@@ -232,8 +245,8 @@ def main():
     create_summary_table(results)
     
     # Create visualizations
-    print("\n🎨 Creating comparative visualizations...")
-    create_comprehensive_comparison(results)
+    print("\n🎨 Creating individual comparative charts...")
+    create_individual_charts(results)
     
     print("\n✅ Comparison visualization complete!")
 

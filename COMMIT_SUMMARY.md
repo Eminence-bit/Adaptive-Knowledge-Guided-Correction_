@@ -3,18 +3,19 @@
 ## ✅ Ready to Commit
 
 ### Changes Overview
-- **26 files** staged for commit
+- **27 files** staged for commit
 - **5 files** deleted (redundant test scripts and docs)
-- **19 new files** added (core implementation, benchmarks, docs)
-- **2 files** modified (.gitignore, requirements.txt)
+- **20 new files** added (core implementation, benchmarks, docs)
+- **3 files** modified (.gitignore, requirements.txt, README.md)
 
-### New Files Added (19)
+### New Files Added (20)
 
-#### Documentation (4)
+#### Documentation (5)
 1. `BENCHMARK_RESULTS_GUIDE.md` - Guide for benchmark results
 2. `EXTERNAL_DATASET_GUIDE.md` - External dataset testing guide
 3. `HALUEVAL_TESTING_GUIDE.md` - HaluEval testing guide
 4. `COMMIT_CHECKLIST.md` - Pre-commit checklist
+5. `COMMIT_SUMMARY.md` - This comprehensive commit summary
 
 #### Source Code (5)
 5. `src/benchmark_evaluation.py` - Benchmark evaluation system
@@ -46,9 +47,10 @@
 - `src/test_enhanced_kg.py` - Redundant test script
 - `src/test_production_api.py` - Redundant test script
 
-### Files Modified (2)
+### Files Modified (3)
 - `.gitignore` - Updated to exclude large data files and test results
 - `requirements.txt` - Updated dependencies
+- `README.md` - Added comprehensive AKGC vs KGCN comparison section with visualizations
 
 ## 🚫 Properly Excluded
 
